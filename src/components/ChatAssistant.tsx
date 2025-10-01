@@ -61,22 +61,30 @@ const ChatAssistant = () => {
         }
       });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Edge function error:', error);
+        toast({
+          title: "Error",
+          description: error.message || "Failed to send message. Please try again.",
+          variant: "destructive",
+        });
+        return;
+      }
 
-      if (data.error) {
+      if (data?.error) {
         toast({
           title: "Error",
           description: data.error,
           variant: "destructive",
         });
-      } else if (data.reply) {
+      } else if (data?.reply) {
         setMessages([...newMessages, { role: 'assistant', content: data.reply }]);
       }
     } catch (err: any) {
       console.error('Chat error:', err);
       toast({
         title: "Error",
-        description: "Failed to send message. Please try again.",
+        description: err.message || "Failed to send message. Please try again.",
         variant: "destructive",
       });
     } finally {

@@ -69,25 +69,32 @@ const AISummarizer = () => {
     try {
       const documentText = await extractTextFromFile(file);
 
-      const { data, error: functionError } = await supabase.functions.invoke('summarize-document', {
+      const { data, error } = await supabase.functions.invoke('summarize-document', {
         body: { 
           documentText,
           fileName: file.name 
         }
       });
 
-      if (functionError) {
-        throw functionError;
+      if (error) {
+        console.error('Edge function error:', error);
+        setError(error.message || 'Failed to process document');
+        toast({
+          title: "Error",
+          description: error.message || "Failed to process document. Please try again.",
+          variant: "destructive",
+        });
+        return;
       }
 
-      if (data.error) {
+      if (data?.error) {
         setError(data.error);
         toast({
           title: "Error",
           description: data.error,
           variant: "destructive",
         });
-      } else if (data.summary) {
+      } else if (data?.summary) {
         setSummary(data.summary);
         toast({
           title: "Success",
@@ -96,10 +103,11 @@ const AISummarizer = () => {
       }
     } catch (err: any) {
       console.error('Summarization error:', err);
-      setError(err.message || 'Failed to summarize document');
+      const errorMsg = err.message || 'Failed to summarize document';
+      setError(errorMsg);
       toast({
         title: "Error",
-        description: "Failed to process document. Please try again.",
+        description: errorMsg,
         variant: "destructive",
       });
     } finally {
