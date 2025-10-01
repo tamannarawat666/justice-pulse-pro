@@ -14,12 +14,21 @@ interface Message {
 const ChatAssistant = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState<Message[]>([
-    { role: 'assistant', content: 'Hello! I\'m your legal assistant. How can I help you today?' }
+    { role: 'assistant', content: 'Hello! I\'m your legal assistant for Justice Hub (2025). How can I help you today?' }
   ]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
+
+  const handleClose = () => {
+    setIsOpen(false);
+    // Reset conversation when closing
+    setMessages([
+      { role: 'assistant', content: 'Hello! I\'m your legal assistant for Justice Hub (2025). How can I help you today?' }
+    ]);
+    setInput('');
+  };
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -87,7 +96,7 @@ const ChatAssistant = () => {
       {!isOpen && (
         <Button
           onClick={() => setIsOpen(true)}
-          className="fixed bottom-6 right-6 rounded-full h-14 w-14 shadow-lg hover:shadow-xl transition-shadow"
+          className="fixed bottom-6 right-6 rounded-full h-14 w-14 shadow-lg hover:shadow-xl transition-shadow z-50"
           size="icon"
         >
           <MessageCircle className="h-6 w-6" />
@@ -95,7 +104,7 @@ const ChatAssistant = () => {
       )}
 
       {isOpen && (
-        <Card className="fixed bottom-6 right-6 w-96 h-[500px] shadow-xl flex flex-col">
+        <Card className="fixed bottom-6 right-6 w-96 h-[500px] shadow-xl flex flex-col z-50">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
             <CardTitle className="flex items-center gap-2">
               <Bot className="h-5 w-5 text-primary" />
@@ -104,7 +113,7 @@ const ChatAssistant = () => {
             <Button
               variant="ghost"
               size="icon"
-              onClick={() => setIsOpen(false)}
+              onClick={handleClose}
               className="h-8 w-8"
             >
               <X className="h-4 w-4" />

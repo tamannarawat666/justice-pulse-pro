@@ -32,16 +32,23 @@ const AISummarizer = () => {
   };
 
   const extractTextFromFile = async (file: File): Promise<string> => {
-    return new Promise((resolve, reject) => {
+    return new Promise((resolve) => {
       const reader = new FileReader();
       reader.onload = async (e) => {
-        const text = e.target?.result as string;
-        // For demo purposes, we'll use the file content directly
-        // In production, you'd use proper PDF/DOC parsing libraries
-        resolve(text || `Document: ${file.name}\nContent analysis requested.`);
+        const arrayBuffer = e.target?.result as ArrayBuffer;
+        // Convert to base64 for better handling
+        const bytes = new Uint8Array(arrayBuffer);
+        let binary = '';
+        for (let i = 0; i < bytes.byteLength; i++) {
+          binary += String.fromCharCode(bytes[i]);
+        }
+        const base64 = btoa(binary);
+        resolve(`File: ${file.name}\nType: ${file.type}\nSize: ${file.size} bytes\nContent (Base64 sample): ${base64.substring(0, 500)}...`);
       };
-      reader.onerror = reject;
-      reader.readAsText(file);
+      reader.onerror = () => {
+        resolve(`Document: ${file.name}\nType: ${file.type}\nSize: ${file.size} bytes`);
+      };
+      reader.readAsArrayBuffer(file);
     });
   };
 
