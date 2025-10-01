@@ -14,7 +14,7 @@ interface Message {
 const ChatAssistant = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState<Message[]>([
-    { role: 'assistant', content: 'Hello! I\'m your legal assistant for Justice Hub (2025). How can I help you today?' }
+    { role: 'assistant', content: 'Hello! I\'m your legal assistant for Justice Hub. How can I help you today?' }
   ]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
@@ -25,7 +25,7 @@ const ChatAssistant = () => {
     setIsOpen(false);
     // Reset conversation when closing
     setMessages([
-      { role: 'assistant', content: 'Hello! I\'m your legal assistant for Justice Hub (2025). How can I help you today?' }
+      { role: 'assistant', content: 'Hello! I\'m your legal assistant for Justice Hub. How can I help you today?' }
     ]);
     setInput('');
   };
