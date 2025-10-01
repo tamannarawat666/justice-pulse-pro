@@ -1,1 +1,7 @@
 project_id = "cynumzzacngqdqnvztlz"
+
+[functions.chat-assistant]
+verify_jwt = false
+
+[functions.summarize-document]
+verify_jwt = false

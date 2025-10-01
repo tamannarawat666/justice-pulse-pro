@@ -7,6 +7,7 @@ import { AuthProvider } from "@/contexts/AuthContext";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
+import ChatAssistant from "@/components/ChatAssistant";
 import Home from "./pages/Home";
 import Login from "./pages/Login";
 import Signup from "./pages/Signup";
@@ -19,6 +20,7 @@ import Documents from "./pages/Documents";
 import Complaint from "./pages/Complaint";
 import LegalAwareness from "./pages/LegalAwareness";
 import Dashboard from "./pages/Dashboard";
+import AISummarizer from "./pages/AISummarizer";
 import NotFoundPage from "./pages/NotFoundPage";
 
 const queryClient = new QueryClient();
@@ -67,10 +69,19 @@ const App = () => (
                     </ProtectedRoute>
                   } 
                 />
+                <Route 
+                  path="/ai-summarizer" 
+                  element={
+                    <ProtectedRoute>
+                      <AISummarizer />
+                    </ProtectedRoute>
+                  } 
+                />
                 <Route path="*" element={<NotFoundPage />} />
               </Routes>
             </main>
             <Footer />
+            <ChatAssistant />
           </div>
         </BrowserRouter>
       </AuthProvider>

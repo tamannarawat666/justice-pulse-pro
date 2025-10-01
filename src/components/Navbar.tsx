@@ -32,6 +32,7 @@ const Navbar = () => {
     { path: '/lawyers', label: 'Legal Directory', icon: Users },
     { path: '/tracker', label: 'Court Tracker', icon: Calendar, protected: true },
     { path: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, protected: true },
+    { path: '/ai-summarizer', label: 'AI Summarizer', icon: FileText, protected: true },
   ];
 
   return (
