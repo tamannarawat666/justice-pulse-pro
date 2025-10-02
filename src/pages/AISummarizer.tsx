@@ -75,25 +75,31 @@ const AISummarizer = () => {
         }
       });
 
+      // Check if the response contains validation error (document not legal)
+      if (data?.error && data?.isLegal === false) {
+        setError(data.error);
+        toast({
+          title: "Not a Legal Document",
+          description: data.error,
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Check for other errors
       if (error) {
         console.error('Edge function error:', error);
         setError(error.message || 'Failed to process document');
         toast({
-          title: "Error",
+          title: "Processing Error",
           description: error.message || "Failed to process document. Please try again.",
           variant: "destructive",
         });
         return;
       }
 
-      if (data?.error) {
-        setError(data.error);
-        toast({
-          title: "Invalid Document",
-          description: data.error,
-          variant: "destructive",
-        });
-      } else if (data?.summary) {
+      // Success case
+      if (data?.summary) {
         setSummary(data.summary);
         toast({
           title: "Success!",

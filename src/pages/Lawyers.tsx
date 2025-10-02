@@ -3,6 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Search, MapPin, Phone, Star, User, Mail, Briefcase } from 'lucide-react';
+import IndiaMap from '@/components/IndiaMap';
 
 interface Lawyer {
   id: string;
@@ -185,82 +186,8 @@ const Lawyers = () => {
           <p className="text-muted-foreground">Interactive map showing verified legal professionals</p>
         </CardHeader>
         <CardContent>
-          <div className="relative h-[500px] rounded-xl overflow-hidden border-2 border-border">
-            {/* Map Background */}
-            <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-accent/5">
-              <svg viewBox="0 0 800 600" className="w-full h-full">
-                {/* India map outline (simplified) */}
-                <path
-                  d="M 400 100 L 450 150 L 480 180 L 500 230 L 510 280 L 500 330 L 480 380 L 450 420 L 420 450 L 380 470 L 340 480 L 300 470 L 270 450 L 250 420 L 240 380 L 230 330 L 240 280 L 260 230 L 290 180 L 330 150 L 370 120 Z"
-                  fill="hsl(var(--primary) / 0.1)"
-                  stroke="hsl(var(--primary))"
-                  strokeWidth="2"
-                />
-                
-                {/* Location markers */}
-                {filteredLawyers.map((lawyer, index) => {
-                  const x = 250 + (lawyer.lng - 70) * 3;
-                  const y = 150 + (30 - lawyer.lat) * 15;
-                  
-                  return (
-                    <g key={lawyer.id} className="animate-scale-in" style={{ animationDelay: `${index * 100}ms` }}>
-                      <circle
-                        cx={x}
-                        cy={y}
-                        r="8"
-                        fill="hsl(var(--accent))"
-                        stroke="white"
-                        strokeWidth="2"
-                        className="cursor-pointer hover:r-12 transition-all"
-                      >
-                        <animate
-                          attributeName="opacity"
-                          values="1;0.5;1"
-                          dur="2s"
-                          repeatCount="indefinite"
-                        />
-                      </circle>
-                      <circle
-                        cx={x}
-                        cy={y}
-                        r="16"
-                        fill="none"
-                        stroke="hsl(var(--accent))"
-                        strokeWidth="1"
-                        opacity="0.5"
-                      >
-                        <animate
-                          attributeName="r"
-                          values="16;24;16"
-                          dur="2s"
-                          repeatCount="indefinite"
-                        />
-                      </circle>
-                    </g>
-                  );
-                })}
-              </svg>
-            </div>
-
-            {/* Legend */}
-            <div className="absolute bottom-4 left-4 bg-card/95 backdrop-blur-sm rounded-lg p-4 shadow-lg border">
-              <div className="flex items-center gap-3 mb-2">
-                <div className="w-3 h-3 rounded-full bg-accent"></div>
-                <span className="text-sm font-medium">Lawyer Location</span>
-              </div>
-              <p className="text-xs text-muted-foreground">{filteredLawyers.length} lawyers available</p>
-            </div>
-
-            {/* Info card */}
-            <div className="absolute top-4 right-4 bg-card/95 backdrop-blur-sm rounded-lg p-4 shadow-lg border max-w-xs">
-              <h3 className="font-bold mb-2 flex items-center gap-2">
-                <MapPin className="h-4 w-4 text-accent" />
-                Coverage
-              </h3>
-              <p className="text-sm text-muted-foreground">
-                Our network of verified legal professionals spans across major cities in India, providing accessible justice to all.
-              </p>
-            </div>
+          <div className="h-[600px]">
+            <IndiaMap lawyers={filteredLawyers} />
           </div>
         </CardContent>
       </Card>
