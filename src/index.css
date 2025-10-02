@@ -9,72 +9,74 @@ All colors MUST be HSL.
 @layer base {
   :root {
     --background: 0 0% 100%;
-    --foreground: 217 33% 17%;
+    --foreground: 222 47% 11%;
 
     --card: 0 0% 100%;
-    --card-foreground: 217 33% 17%;
+    --card-foreground: 222 47% 11%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 217 33% 17%;
+    --popover-foreground: 222 47% 11%;
 
-    --primary: 217 91% 40%;
+    --primary: 222 47% 25%;
     --primary-foreground: 0 0% 100%;
 
-    --secondary: 210 40% 96%;
-    --secondary-foreground: 217 91% 40%;
+    --secondary: 45 100% 51%;
+    --secondary-foreground: 222 47% 11%;
 
     --muted: 210 40% 96%;
     --muted-foreground: 215 16% 47%;
 
-    --accent: 43 96% 56%;
-    --accent-foreground: 217 33% 17%;
+    --accent: 45 100% 51%;
+    --accent-foreground: 222 47% 11%;
 
     --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 100%;
 
     --border: 214 32% 91%;
     --input: 214 32% 91%;
-    --ring: 217 91% 40%;
+    --ring: 222 47% 25%;
 
     --radius: 0.5rem;
 
-    --gradient-hero: linear-gradient(135deg, hsl(217 91% 40%) 0%, hsl(217 91% 50%) 100%);
+    --gradient-hero: linear-gradient(135deg, hsl(222 47% 25%) 0%, hsl(222 47% 35%) 100%);
     --gradient-card: linear-gradient(to bottom, hsl(0 0% 100%) 0%, hsl(210 40% 98%) 100%);
+    --gradient-accent: linear-gradient(135deg, hsl(45 100% 51%) 0%, hsl(40 100% 60%) 100%);
     
-    --shadow-sm: 0 1px 2px 0 hsl(217 33% 17% / 0.05);
-    --shadow-md: 0 4px 6px -1px hsl(217 33% 17% / 0.1);
-    --shadow-lg: 0 10px 15px -3px hsl(217 33% 17% / 0.1);
-    --shadow-xl: 0 20px 25px -5px hsl(217 33% 17% / 0.1);
+    --shadow-sm: 0 1px 2px 0 hsl(222 47% 11% / 0.05);
+    --shadow-md: 0 4px 6px -1px hsl(222 47% 11% / 0.1);
+    --shadow-lg: 0 10px 15px -3px hsl(222 47% 11% / 0.1);
+    --shadow-xl: 0 20px 25px -5px hsl(222 47% 11% / 0.2);
+    --shadow-glow: 0 0 30px hsl(45 100% 51% / 0.3);
   }
 
   .dark {
-    --background: 217 33% 17%;
+    --background: 222 47% 11%;
     --foreground: 0 0% 100%;
 
-    --card: 217 33% 20%;
+    --card: 222 47% 15%;
     --card-foreground: 0 0% 100%;
 
-    --popover: 217 33% 20%;
+    --popover: 222 47% 15%;
     --popover-foreground: 0 0% 100%;
 
-    --primary: 217 91% 50%;
+    --primary: 222 47% 35%;
     --primary-foreground: 0 0% 100%;
 
-    --secondary: 217 33% 25%;
-    --secondary-foreground: 0 0% 100%;
+    --secondary: 45 100% 51%;
+    --secondary-foreground: 222 47% 11%;
 
-    --muted: 217 33% 25%;
+    --muted: 222 47% 20%;
     --muted-foreground: 215 20% 65%;
 
-    --accent: 43 96% 56%;
-    --accent-foreground: 217 33% 17%;
+    --accent: 45 100% 51%;
+    --accent-foreground: 222 47% 11%;
 
     --destructive: 0 63% 31%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 217 33% 25%;
-    --input: 217 33% 25%;
-    --ring: 217 91% 50%;
+    --border: 222 47% 20%;
+    --input: 222 47% 20%;
+    --ring: 222 47% 35%;
   }
 }
 
@@ -101,20 +103,40 @@ All colors MUST be HSL.
     background: var(--gradient-card);
   }
 
+  .gradient-accent {
+    background: var(--gradient-accent);
+  }
+
   .shadow-custom {
     box-shadow: var(--shadow-md);
+  }
+
+  .shadow-glow {
+    box-shadow: var(--shadow-glow);
   }
 
   .text-gradient {
     @apply bg-clip-text text-transparent bg-gradient-to-r from-primary to-primary/70;
   }
 
+  .text-gradient-accent {
+    @apply bg-clip-text text-transparent bg-gradient-to-r from-accent to-secondary;
+  }
+
   .animate-fade-in {
-    animation: fadeIn 0.5s ease-in;
+    animation: fadeIn 0.8s ease-in;
   }
 
   .animate-slide-up {
-    animation: slideUp 0.6s ease-out;
+    animation: slideUp 0.8s ease-out;
+  }
+
+  .animate-scale-in {
+    animation: scaleIn 0.6s ease-out;
+  }
+
+  .animate-float {
+    animation: float 3s ease-in-out infinite;
   }
 
   @keyframes fadeIn {
@@ -129,11 +151,31 @@ All colors MUST be HSL.
   @keyframes slideUp {
     from {
       opacity: 0;
-      transform: translateY(20px);
+      transform: translateY(30px);
     }
     to {
       opacity: 1;
       transform: translateY(0);
+    }
+  }
+
+  @keyframes scaleIn {
+    from {
+      opacity: 0;
+      transform: scale(0.9);
+    }
+    to {
+      opacity: 1;
+      transform: scale(1);
+    }
+  }
+
+  @keyframes float {
+    0%, 100% {
+      transform: translateY(0px);
+    }
+    50% {
+      transform: translateY(-10px);
     }
   }
 }

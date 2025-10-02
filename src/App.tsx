@@ -39,12 +39,47 @@ const App = () => (
                 <Route path="/" element={<Home />} />
                 <Route path="/login" element={<Login />} />
                 <Route path="/signup" element={<Signup />} />
-                <Route path="/cases" element={<Cases />} />
-                <Route path="/cases/:id" element={<CaseDetail />} />
-                <Route path="/lawyers" element={<Lawyers />} />
-                <Route path="/documents" element={<Documents />} />
-                <Route path="/complaint" element={<Complaint />} />
                 <Route path="/awareness" element={<LegalAwareness />} />
+                <Route 
+                  path="/cases" 
+                  element={
+                    <ProtectedRoute>
+                      <Cases />
+                    </ProtectedRoute>
+                  } 
+                />
+                <Route 
+                  path="/cases/:id" 
+                  element={
+                    <ProtectedRoute>
+                      <CaseDetail />
+                    </ProtectedRoute>
+                  } 
+                />
+                <Route 
+                  path="/lawyers" 
+                  element={
+                    <ProtectedRoute>
+                      <Lawyers />
+                    </ProtectedRoute>
+                  } 
+                />
+                <Route 
+                  path="/documents" 
+                  element={
+                    <ProtectedRoute>
+                      <Documents />
+                    </ProtectedRoute>
+                  } 
+                />
+                <Route 
+                  path="/complaint" 
+                  element={
+                    <ProtectedRoute>
+                      <Complaint />
+                    </ProtectedRoute>
+                  } 
+                />
                 <Route 
                   path="/file-case" 
                   element={
