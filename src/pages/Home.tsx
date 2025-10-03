@@ -62,12 +62,13 @@ const Home = () => {
     },
   ];
 
-  const stats = [
-    { icon: Shield, value: '10,000+', label: 'Cases Filed' },
-    { icon: Users, value: '500+', label: 'Verified Lawyers' },
-    { icon: Clock, value: '24/7', label: 'Support Available' },
-    { icon: TrendingUp, value: '95%', label: 'Success Rate' },
-  ];
+ 
+const stats = [
+  { icon: Shield, value: 'Reliable', label: 'Trusted Legal Resources' },
+  { icon: Users, value: 'Expert', label: 'Experienced Lawyers' },
+  { icon: Clock, value: 'Anytime', label: 'Easy Access 24/7' },
+  { icon: TrendingUp, value: 'Growing', label: 'New Cases Added Regularly' },
+];
 
   return (
     <div className="min-h-screen">
@@ -115,30 +116,7 @@ const Home = () => {
         <div className="absolute bottom-0 left-0 right-0 h-24 bg-gradient-to-t from-background to-transparent"></div>
       </section>
 
-      {/* Stats Section */}
-      <section className="py-16 bg-muted/30">
-        <div className="container mx-auto px-4">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
-            {stats.map((stat, index) => {
-              const Icon = stat.icon;
-              return (
-                <div 
-                  key={index} 
-                  className="text-center animate-fade-in"
-                  style={{ animationDelay: `${index * 100}ms` }}
-                >
-                  <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-primary/10 mb-4">
-                    <Icon className="h-8 w-8 text-primary" />
-                  </div>
-                  <div className="text-3xl md:text-4xl font-bold mb-2 text-gradient">{stat.value}</div>
-                  <div className="text-muted-foreground">{stat.label}</div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      </section>
-
+      
       {/* Features Section */}
       <section className="py-20">
         <div className="container mx-auto px-4">
