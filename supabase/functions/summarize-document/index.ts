@@ -32,7 +32,7 @@ serve(async (req) => {
         messages: [
           { 
             role: "system", 
-            content: "You are a legal document classifier. Respond with ONLY 'YES' if the document is legal in nature (contracts, agreements, court documents, legal notices, petitions, etc.) or 'NO' if it is not." 
+            content: "You are a legal document classifier. Respond with ONLY 'YES' if the document is a valid legal document (examples: agreements, contracts, court orders, petitions, notices, affidavits, judgments) or 'NO' if it is not." 
           },
           { 
             role: "user", 
@@ -66,7 +66,7 @@ serve(async (req) => {
     if (!isLegal) {
       return new Response(
         JSON.stringify({ 
-          error: "This does not appear to be a legal document. Please upload a legal document such as contracts, agreements, court documents, or legal notices.",
+          error: "⚠️ This does not appear to be a valid legal document. Please upload a legal document to continue.",
           isLegal: false 
         }), 
         {
@@ -88,11 +88,21 @@ serve(async (req) => {
         messages: [
           { 
             role: "system", 
-            content: "You are a legal expert who explains complex legal documents in simple, easy-to-understand language. Create a clear summary with key points, important dates, parties involved, and main obligations." 
+            content: `You are the Legal Document Summarizer for Justice Hub.
+Summarize legal documents in clear, simple terms so a non-lawyer can understand.
+Include:
+• Type of document (e.g., contract, agreement, judgment)
+• Who the parties are
+• Main issues or claims
+• Key obligations, deadlines, or rulings
+• Any important next steps the user should know
+
+Always end with:
+"✅ This is a simplified summary. For detailed legal advice, please consult a qualified lawyer."` 
           },
           { 
             role: "user", 
-            content: `Please summarize this legal document in simple, easy-to-understand language:\n\n${documentText}` 
+            content: `Please summarize this legal document:\n\n${documentText}` 
           }
         ],
       }),
