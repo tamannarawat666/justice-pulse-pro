@@ -14,7 +14,36 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      court_hearings: {
+        Row: {
+          case_name: string
+          court_date: string
+          created_at: string
+          id: string
+          updated_at: string
+          user_email: string
+          user_id: string
+        }
+        Insert: {
+          case_name: string
+          court_date: string
+          created_at?: string
+          id?: string
+          updated_at?: string
+          user_email: string
+          user_id: string
+        }
+        Update: {
+          case_name?: string
+          court_date?: string
+          created_at?: string
+          id?: string
+          updated_at?: string
+          user_email?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
