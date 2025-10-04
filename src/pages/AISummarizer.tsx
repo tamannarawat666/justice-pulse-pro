@@ -98,9 +98,23 @@ const AISummarizer = () => {
         return;
       }
 
-      // Success case
-      if (data?.summary) {
-        setSummary(data.summary);
+      // Handle JSON response from AI
+      if (data?.status === "error") {
+        setError(data.message);
+        toast({
+          title: "Error",
+          description: data.message,
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Success case - format the bullet points
+      if (data?.status === "success" && data?.summary) {
+        const formattedSummary = data.summary.map((point: string, index: number) => 
+          `${index + 1}. ${point}`
+        ).join('\n\n');
+        setSummary(formattedSummary);
         toast({
           title: "Success!",
           description: "Legal document summarized successfully",

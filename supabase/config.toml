@@ -5,3 +5,6 @@ verify_jwt = false
 
 [functions.summarize-document]
 verify_jwt = false
+
+[functions.court-reminder]
+verify_jwt = false

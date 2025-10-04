@@ -88,21 +88,31 @@ serve(async (req) => {
         messages: [
           { 
             role: "system", 
-            content: `You are the Legal Document Summarizer for Justice Hub.
-Summarize legal documents in clear, simple terms so a non-lawyer can understand.
-Include:
-• Type of document (e.g., contract, agreement, judgment)
-• Who the parties are
-• Main issues or claims
-• Key obligations, deadlines, or rulings
-• Any important next steps the user should know
+            content: `You are a legal document summarizer. You MUST respond ONLY in valid JSON format with no additional text.
 
-Always end with:
-"✅ This is a simplified summary. For detailed legal advice, please consult a qualified lawyer."` 
+For valid legal documents (contracts, agreements, court filings, legal notices, laws, regulations), respond:
+{
+  "status": "success",
+  "summary": [
+    "Bullet point 1 about document type and parties",
+    "Bullet point 2 about main issues or claims",
+    "Bullet point 3 about key obligations or deadlines",
+    "Bullet point 4 about important next steps (if applicable)",
+    "Bullet point 5 about relevant laws or rights (if applicable)"
+  ]
+}
+
+Provide 3-5 concise bullet points highlighting:
+- Type of document and involved parties
+- Main legal points and claims
+- Key obligations and deadlines
+- Important next steps
+
+Do NOT include any text outside the JSON structure.` 
           },
           { 
             role: "user", 
-            content: `Please summarize this legal document:\n\n${documentText}` 
+            content: `Summarize this legal document:\n\n${documentText}` 
           }
         ],
       }),
@@ -113,12 +123,30 @@ Always end with:
     }
 
     const summaryData = await summaryResponse.json();
-    const summary = summaryData.choices[0].message.content;
+    const summaryContent = summaryData.choices[0].message.content;
 
     console.log("Summary generated successfully");
 
+    // Parse the JSON response from AI
+    let parsedSummary;
+    try {
+      parsedSummary = JSON.parse(summaryContent);
+    } catch (e) {
+      console.error("Failed to parse AI response as JSON:", summaryContent);
+      return new Response(
+        JSON.stringify({ 
+          status: "error",
+          message: "Failed to generate summary in proper format"
+        }),
+        {
+          status: 500,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        }
+      );
+    }
+
     return new Response(
-      JSON.stringify({ summary, isLegal: true }),
+      JSON.stringify(parsedSummary),
       {
         status: 200,
         headers: { ...corsHeaders, "Content-Type": "application/json" },

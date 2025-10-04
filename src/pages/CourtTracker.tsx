@@ -1,6 +1,12 @@
+import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Calendar, Clock, MapPin, AlertCircle } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Calendar, Clock, MapPin, AlertCircle, Plus } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
+import { useToast } from '@/hooks/use-toast';
 
 interface Hearing {
   id: string;
@@ -39,6 +45,50 @@ const mockHearings: Hearing[] = [
 ];
 
 const CourtTracker = () => {
+  const [caseName, setCaseName] = useState("");
+  const [courtDate, setCourtDate] = useState("");
+  const [userEmail, setUserEmail] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const { toast } = useToast();
+
+  const handleAddReminder = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSubmitting(true);
+
+    try {
+      const { data, error } = await supabase.functions.invoke('court-reminder', {
+        body: { caseName, courtDate, userEmail }
+      });
+
+      if (error) throw error;
+
+      if (data?.status === "error") {
+        toast({
+          title: "Error",
+          description: data.message,
+          variant: "destructive",
+        });
+      } else if (data?.status === "success") {
+        toast({
+          title: "Reminder Added",
+          description: `Court reminder for ${data.case_name} has been set successfully.`,
+        });
+        // Reset form
+        setCaseName("");
+        setCourtDate("");
+        setUserEmail("");
+      }
+    } catch (error) {
+      console.error("Error adding reminder:", error);
+      toast({
+        title: "Error",
+        description: "Failed to add court reminder. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
   return (
     <div className="container mx-auto px-4 py-8">
       <div className="mb-8">
@@ -47,6 +97,56 @@ const CourtTracker = () => {
       </div>
 
       <div className="grid gap-6 mb-8">
+        {/* Add Reminder Form */}
+        <Card className="bg-accent/5 border-accent/20">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Plus className="h-5 w-5 text-accent" />
+              Add Court Reminder
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <form onSubmit={handleAddReminder} className="space-y-4">
+              <div className="grid md:grid-cols-3 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="caseName">Case Name</Label>
+                  <Input
+                    id="caseName"
+                    value={caseName}
+                    onChange={(e) => setCaseName(e.target.value)}
+                    placeholder="Enter case name"
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="courtDate">Court Date & Time</Label>
+                  <Input
+                    id="courtDate"
+                    type="datetime-local"
+                    value={courtDate}
+                    onChange={(e) => setCourtDate(e.target.value)}
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="email">Your Email</Label>
+                  <Input
+                    id="email"
+                    type="email"
+                    value={userEmail}
+                    onChange={(e) => setUserEmail(e.target.value)}
+                    placeholder="your.email@example.com"
+                    required
+                  />
+                </div>
+              </div>
+              <Button type="submit" disabled={isSubmitting} className="w-full">
+                {isSubmitting ? "Adding Reminder..." : "Add Reminder"}
+              </Button>
+            </form>
+          </CardContent>
+        </Card>
+
         <Card className="bg-primary/5 border-primary/20">
           <CardContent className="p-6">
             <div className="flex items-center gap-3">
