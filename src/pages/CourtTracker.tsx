@@ -49,6 +49,8 @@ const CourtTracker = () => {
   const [courtDate, setCourtDate] = useState("");
   const [userEmail, setUserEmail] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [hearings, setHearings] = useState<Hearing[]>(mockHearings);
+  const [calendar, setCalendar] = useState<Record<string, Hearing[]>>({});
   const { toast } = useToast();
 
   const handleAddReminder = async (e: React.FormEvent) => {
@@ -60,7 +62,16 @@ const CourtTracker = () => {
         body: { caseName, courtDate, userEmail }
       });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Edge function error:', error);
+        toast({
+          title: "Error",
+          description: "Failed to add reminder. Please try again.",
+          variant: "destructive",
+        });
+        setIsSubmitting(false);
+        return;
+      }
 
       if (data?.status === "error") {
         toast({
@@ -70,9 +81,27 @@ const CourtTracker = () => {
         });
       } else if (data?.status === "success") {
         toast({
-          title: "Reminder Added",
-          description: `Court reminder for ${data.case_name} has been set successfully.`,
+          title: "Success",
+          description: data.message,
         });
+        
+        // Update local state with new schedule and calendar
+        if (data.upcoming_schedule) {
+          const formattedHearings = data.upcoming_schedule.map((h: any) => ({
+            id: Math.random().toString(),
+            caseTitle: h.case_name,
+            date: new Date(h.court_date).toLocaleDateString(),
+            time: new Date(h.court_date).toLocaleTimeString(),
+            court: 'Court details pending',
+            type: 'Hearing'
+          }));
+          setHearings(formattedHearings);
+        }
+
+        if (data.calendar) {
+          setCalendar(data.calendar);
+        }
+
         // Reset form
         setCaseName("");
         setCourtDate("");
@@ -154,14 +183,14 @@ const CourtTracker = () => {
               <div>
                 <p className="font-medium">Next Hearing</p>
                 <p className="text-sm text-muted-foreground">
-                  You have {mockHearings.length} upcoming hearings scheduled
+                  You have {hearings.length} upcoming hearings scheduled
                 </p>
               </div>
             </div>
           </CardContent>
         </Card>
 
-        {mockHearings.map((hearing) => (
+        {hearings.map((hearing) => (
           <Card key={hearing.id} className="hover:shadow-lg transition-shadow">
             <CardHeader>
               <div className="flex items-start justify-between">
