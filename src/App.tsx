@@ -22,6 +22,7 @@ import LegalAwareness from "./pages/LegalAwareness";
 import Dashboard from "./pages/Dashboard";
 import AISummarizer from "./pages/AISummarizer";
 import NotFoundPage from "./pages/NotFoundPage";
+import CommunityForum from "./pages/CommunityForum";
 
 const queryClient = new QueryClient();
 
@@ -109,6 +110,14 @@ const App = () => (
                   element={
                     <ProtectedRoute>
                       <AISummarizer />
+                    </ProtectedRoute>
+                  } 
+                />
+                <Route 
+                  path="/community" 
+                  element={
+                    <ProtectedRoute>
+                      <CommunityForum />
                     </ProtectedRoute>
                   } 
                 />

@@ -9,7 +9,8 @@ import {
   LayoutDashboard,
   Scale,
   User,
-  LogOut
+  LogOut,
+  MessageSquare
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -30,6 +31,7 @@ const Navbar = () => {
     { path: '/cases', label: 'Cases', icon: FileText },
     { path: '/file-case', label: 'File Case', icon: FolderOpen, protected: true },
     { path: '/lawyers', label: 'Legal Directory', icon: Users },
+    { path: '/community', label: 'Community', icon: MessageSquare, protected: true },
     { path: '/tracker', label: 'Court Tracker', icon: Calendar, protected: true },
     { path: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, protected: true },
     { path: '/ai-summarizer', label: 'AI Summarizer', icon: FileText, protected: true },
