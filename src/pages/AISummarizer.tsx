@@ -52,88 +52,77 @@ const AISummarizer = () => {
   };
 
   const handleSummarize = async () => {
-    if (!file) {
+  if (!file) {
+    toast({
+      title: "No file selected",
+      description: "Please upload a legal document first",
+      variant: "destructive",
+    });
+    return;
+  }
+
+  setLoading(true);
+  setError('');
+  setSummary('');
+
+  try {
+    // Extract text from the uploaded file
+    const documentText = await extractTextFromFile(file);
+
+    // 🔗 Send the text to your backend summarizer API
+   const formData = new FormData();
+formData.append("file", file);
+
+const response = await fetch("http://localhost:5000/summarize", {
+  method: "POST",
+  body: formData,
+});
+
+    const data = await response.json();
+
+    if (data.isLegal === false) {
+      setError(data.error);
       toast({
-        title: "No file selected",
-        description: "Please upload a legal document first",
+        title: "Not a Legal Document",
+        description: data.error,
         variant: "destructive",
       });
       return;
     }
 
-    setLoading(true);
-    setError('');
-    setSummary('');
-
-    try {
-      const documentText = await extractTextFromFile(file);
-
-      const { data, error } = await supabase.functions.invoke('summarize-document', {
-        body: { 
-          documentText,
-          fileName: file.name 
-        }
-      });
-
-      // Check if the response contains validation error (document not legal)
-      if (data?.error && data?.isLegal === false) {
-        setError(data.error);
-        toast({
-          title: "Not a Legal Document",
-          description: data.error,
-          variant: "destructive",
-        });
-        return;
-      }
-
-      // Check for other errors
-      if (error) {
-        console.error('Edge function error:', error);
-        setError(error.message || 'Failed to process document');
-        toast({
-          title: "Processing Error",
-          description: error.message || "Failed to process document. Please try again.",
-          variant: "destructive",
-        });
-        return;
-      }
-
-      // Handle JSON response from AI
-      if (data?.status === "error") {
-        setError(data.message);
-        toast({
-          title: "Error",
-          description: data.message,
-          variant: "destructive",
-        });
-        return;
-      }
-
-      // Success case - format the bullet points
-      if (data?.status === "success" && data?.summary) {
-        const formattedSummary = data.summary.map((point: string, index: number) => 
-          `${index + 1}. ${point}`
-        ).join('\n\n');
-        setSummary(formattedSummary);
-        toast({
-          title: "Success!",
-          description: "Legal document summarized successfully",
-          className: "bg-accent text-accent-foreground",
-        });
-      }
-    } catch (err: any) {
-      console.error('Summarization error:', err);
-      const errorMsg = err.message || 'Failed to summarize document';
-      setError(errorMsg);
+    if (data.status === "error") {
+      setError(data.message);
       toast({
         title: "Error",
-        description: errorMsg,
+        description: data.message,
         variant: "destructive",
       });
-    } finally {
-      setLoading(false);
+      return;
     }
-  };
+
+    if (data.status === "success") {
+      const formattedSummary = data.summary.map((point, i) => `${i + 1}. ${point}`).join("\n\n");
+      setSummary(formattedSummary);
+      toast({
+        title: "Success!",
+        description: "Legal document summarized successfully",
+        className: "bg-accent text-accent-foreground",
+      });
+    }
+  } catch (err) {
+    console.error("Summarization error:", err);
+    const errorMsg = err.message || "Failed to summarize document";
+    setError(errorMsg);
+    toast({
+      title: "Error",
+      description: errorMsg,
+      variant: "destructive",
+    });
+  } finally {
+    setLoading(false);
+  }
+};
+
 
   const handleCopy = () => {
     navigator.clipboard.writeText(summary);
