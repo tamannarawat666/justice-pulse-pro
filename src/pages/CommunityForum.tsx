@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/components/ui/use-toast';
-import { Heart, MessageCircle, Send, Sparkles, MapPin, Filter } from 'lucide-react';
+import { Heart, MessageCircle, Send, Sparkles, MapPin, Filter, Upload, FileText, Image as ImageIcon, Reply } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 
 interface Post {
@@ -21,6 +21,7 @@ interface Post {
   likes_count: number;
   comments_count: number;
   created_at: string;
+  attachment_url: string | null;
   is_liked?: boolean;
 }
 
@@ -31,6 +32,7 @@ interface Comment {
   user_name: string;
   content: string;
   created_at: string;
+  parent_comment_id: string | null;
 }
 
 const CATEGORIES = [
@@ -58,10 +60,14 @@ const CommunityForum = () => {
     location: ''
   });
   const [newComment, setNewComment] = useState<{ [key: string]: string }>({});
+  const [replyingTo, setReplyingTo] = useState<{ [key: string]: string | null }>({});
   const [selectedCategory, setSelectedCategory] = useState('All Topics');
   const [selectedLocation, setSelectedLocation] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
   const [expandedPost, setExpandedPost] = useState<string | null>(null);
   const [showNewPostForm, setShowNewPostForm] = useState(false);
+  const [uploadingFile, setUploadingFile] = useState(false);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
 
   // Fetch posts
   useEffect(() => {
@@ -79,10 +85,6 @@ const CommunityForum = () => {
         },
         () => {
           fetchPosts();
-          toast({
-            title: "✨ New activity!",
-            description: "Someone just shared something in the community",
-          });
         }
       )
       .subscribe();
@@ -90,7 +92,7 @@ const CommunityForum = () => {
     return () => {
       supabase.removeChannel(postsChannel);
     };
-  }, [selectedCategory, selectedLocation]);
+  }, [selectedCategory, selectedLocation, searchQuery]);
 
   const fetchPosts = async () => {
     let query = supabase
@@ -104,6 +106,10 @@ const CommunityForum = () => {
 
     if (selectedLocation) {
       query = query.ilike('location', `%${selectedLocation}%`);
+    }
+
+    if (searchQuery) {
+      query = query.or(`title.ilike.%${searchQuery}%,content.ilike.%${searchQuery}%`);
     }
 
     const { data, error } = await query;
@@ -165,6 +171,64 @@ const CommunityForum = () => {
       .subscribe();
   };
 
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Validate file type
+    const validTypes = ['image/jpeg', 'image/png', 'image/jpg', 'application/pdf'];
+    if (!validTypes.includes(file.type)) {
+      toast({
+        title: "Invalid file type",
+        description: "Please upload an image (JPG, PNG) or PDF file",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    // Validate file size (5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      toast({
+        title: "File too large",
+        description: "Please upload a file smaller than 5MB",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setSelectedFile(file);
+  };
+
+  const uploadFile = async (): Promise<string | null> => {
+    if (!selectedFile || !user) return null;
+
+    setUploadingFile(true);
+    const fileExt = selectedFile.name.split('.').pop();
+    const fileName = `${user.id}/${Date.now()}.${fileExt}`;
+
+    const { error: uploadError } = await supabase.storage
+      .from('forum-attachments')
+      .upload(fileName, selectedFile);
+
+    setUploadingFile(false);
+
+    if (uploadError) {
+      console.error('Error uploading file:', uploadError);
+      toast({
+        title: "Upload failed",
+        description: "Failed to upload file. Please try again.",
+        variant: "destructive"
+      });
+      return null;
+    }
+
+    const { data } = supabase.storage
+      .from('forum-attachments')
+      .getPublicUrl(fileName);
+
+    return data.publicUrl;
+  };
+
   const handleCreatePost = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -186,6 +250,12 @@ const CommunityForum = () => {
       return;
     }
 
+    let attachmentUrl = null;
+    if (selectedFile) {
+      attachmentUrl = await uploadFile();
+      if (!attachmentUrl) return;
+    }
+
     const { error } = await supabase
       .from('posts')
       .insert({
@@ -194,7 +264,8 @@ const CommunityForum = () => {
         title: newPost.title,
         content: newPost.content,
         category: newPost.category,
-        location: newPost.location || null
+        location: newPost.location || null,
+        attachment_url: attachmentUrl
       });
 
     if (error) {
@@ -213,6 +284,7 @@ const CommunityForum = () => {
     });
 
     setNewPost({ title: '', content: '', category: '', location: '' });
+    setSelectedFile(null);
     setShowNewPostForm(false);
     fetchPosts();
   };
@@ -228,7 +300,6 @@ const CommunityForum = () => {
     }
 
     if (isLiked) {
-      // Unlike
       const { error } = await supabase
         .from('post_likes')
         .delete()
@@ -240,7 +311,6 @@ const CommunityForum = () => {
         return;
       }
     } else {
-      // Like
       const { error } = await supabase
         .from('post_likes')
         .insert({
@@ -262,7 +332,7 @@ const CommunityForum = () => {
     fetchPosts();
   };
 
-  const handleAddComment = async (postId: string) => {
+  const handleAddComment = async (postId: string, parentCommentId: string | null = null) => {
     if (!isAuthenticated || !user) {
       toast({
         title: "Please login first",
@@ -281,7 +351,8 @@ const CommunityForum = () => {
         post_id: postId,
         user_id: user.id,
         user_name: user.name,
-        content
+        content,
+        parent_comment_id: parentCommentId
       });
 
     if (error) {
@@ -300,6 +371,7 @@ const CommunityForum = () => {
     });
 
     setNewComment(prev => ({ ...prev, [postId]: '' }));
+    setReplyingTo(prev => ({ ...prev, [postId]: null }));
     fetchComments(postId);
   };
 
@@ -312,6 +384,62 @@ const CommunityForum = () => {
         fetchComments(postId);
       }
     }
+  };
+
+  const renderComments = (postId: string, parentId: string | null = null, depth = 0) => {
+    const filteredComments = (comments[postId] || []).filter(
+      comment => comment.parent_comment_id === parentId
+    );
+
+    return filteredComments.map((comment) => (
+      <div key={comment.id} className={`${depth > 0 ? 'ml-8 border-l-2 border-border pl-4' : ''}`}>
+        <div className="bg-muted/50 rounded-lg p-3 mb-2 animate-slide-up">
+          <div className="flex justify-between items-start mb-2">
+            <span className="font-semibold text-sm">{comment.user_name}</span>
+            <span className="text-xs text-muted-foreground">
+              {formatDistanceToNow(new Date(comment.created_at), { addSuffix: true })}
+            </span>
+          </div>
+          <p className="text-sm mb-2">{comment.content}</p>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setReplyingTo(prev => ({ ...prev, [postId]: comment.id }))}
+          >
+            <Reply className="w-3 h-3 mr-1" />
+            Reply
+          </Button>
+        </div>
+
+        {replyingTo[postId] === comment.id && (
+          <div className="ml-8 mb-2 flex gap-2">
+            <Input
+              placeholder={`Reply to ${comment.user_name}...`}
+              value={newComment[postId] || ''}
+              onChange={(e) => setNewComment({ ...newComment, [postId]: e.target.value })}
+              onKeyPress={(e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault();
+                  handleAddComment(postId, comment.id);
+                }
+              }}
+            />
+            <Button size="sm" onClick={() => handleAddComment(postId, comment.id)}>
+              <Send className="w-4 h-4" />
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => setReplyingTo(prev => ({ ...prev, [postId]: null }))}
+            >
+              Cancel
+            </Button>
+          </div>
+        )}
+
+        {renderComments(postId, comment.id, depth + 1)}
+      </div>
+    ));
   };
 
   return (
@@ -429,15 +557,35 @@ const CommunityForum = () => {
                     onChange={(e) => setNewPost({ ...newPost, location: e.target.value })}
                   />
                 </div>
+                <div className="flex items-center gap-4">
+                  <div className="flex-1">
+                    <label htmlFor="file-upload" className="cursor-pointer">
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <Upload className="w-4 h-4" />
+                        {selectedFile ? selectedFile.name : 'Attach file (image or PDF)'}
+                      </div>
+                      <input
+                        id="file-upload"
+                        type="file"
+                        accept="image/jpeg,image/png,image/jpg,application/pdf"
+                        onChange={handleFileSelect}
+                        className="hidden"
+                      />
+                    </label>
+                  </div>
+                </div>
                 <div className="flex gap-2">
-                  <Button type="submit" className="flex-1">
+                  <Button type="submit" className="flex-1" disabled={uploadingFile}>
                     <Send className="w-4 h-4 mr-2" />
-                    Share with Community
+                    {uploadingFile ? 'Uploading...' : 'Share with Community'}
                   </Button>
                   <Button
                     type="button"
                     variant="outline"
-                    onClick={() => setShowNewPostForm(false)}
+                    onClick={() => {
+                      setShowNewPostForm(false);
+                      setSelectedFile(null);
+                    }}
                   >
                     Cancel
                   </Button>
@@ -447,8 +595,15 @@ const CommunityForum = () => {
           </Card>
         )}
 
-        {/* Filters */}
+        {/* Filters and Search */}
         <div className="flex flex-wrap gap-4 mb-8">
+          <div className="flex-1 min-w-[200px]">
+            <Input
+              placeholder="Search posts..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
+          </div>
           <div className="flex-1 min-w-[200px]">
             <Select value={selectedCategory} onValueChange={setSelectedCategory}>
               <SelectTrigger>
@@ -500,7 +655,7 @@ const CommunityForum = () => {
                   <div className="flex justify-between items-start">
                     <div className="flex-1">
                       <CardTitle className="text-2xl mb-2">{post.title}</CardTitle>
-                      <CardDescription className="flex items-center gap-4 text-sm">
+                      <CardDescription className="flex items-center gap-4 text-sm flex-wrap">
                         <span className="font-semibold">{post.user_name}</span>
                         <span>•</span>
                         <span>{post.category}</span>
@@ -521,6 +676,31 @@ const CommunityForum = () => {
                 </CardHeader>
                 <CardContent>
                   <p className="text-foreground whitespace-pre-wrap mb-4">{post.content}</p>
+                  
+                  {/* Attachment */}
+                  {post.attachment_url && (
+                    <div className="mb-4">
+                      {post.attachment_url.endsWith('.pdf') ? (
+                        <a
+                          href={post.attachment_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex items-center gap-2 text-primary hover:underline"
+                        >
+                          <FileText className="w-4 h-4" />
+                          View attached document
+                        </a>
+                      ) : (
+                        <a href={post.attachment_url} target="_blank" rel="noopener noreferrer">
+                          <img
+                            src={post.attachment_url}
+                            alt="Post attachment"
+                            className="rounded-lg max-h-96 object-cover cursor-pointer hover:opacity-90 transition-opacity"
+                          />
+                        </a>
+                      )}
+                    </div>
+                  )}
                   
                   {/* Interaction Buttons */}
                   <div className="flex gap-4 items-center border-t pt-4">
@@ -550,43 +730,32 @@ const CommunityForum = () => {
                         <h4 className="font-semibold mb-4">Conversation</h4>
                         
                         {/* Comment Input */}
-                        <div className="flex gap-2 mb-4">
-                          <Input
-                            placeholder="Share your thoughts..."
-                            value={newComment[post.id] || ''}
-                            onChange={(e) => setNewComment({ ...newComment, [post.id]: e.target.value })}
-                            onKeyPress={(e) => {
-                              if (e.key === 'Enter' && !e.shiftKey) {
-                                e.preventDefault();
-                                handleAddComment(post.id);
-                              }
-                            }}
-                          />
-                          <Button
-                            size="sm"
-                            onClick={() => handleAddComment(post.id)}
-                          >
-                            <Send className="w-4 h-4" />
-                          </Button>
-                        </div>
+                        {!replyingTo[post.id] && (
+                          <div className="flex gap-2 mb-4">
+                            <Input
+                              placeholder="Share your thoughts..."
+                              value={newComment[post.id] || ''}
+                              onChange={(e) => setNewComment({ ...newComment, [post.id]: e.target.value })}
+                              onKeyPress={(e) => {
+                                if (e.key === 'Enter' && !e.shiftKey) {
+                                  e.preventDefault();
+                                  handleAddComment(post.id);
+                                }
+                              }}
+                            />
+                            <Button
+                              size="sm"
+                              onClick={() => handleAddComment(post.id)}
+                            >
+                              <Send className="w-4 h-4" />
+                            </Button>
+                          </div>
+                        )}
 
                         {/* Comments List */}
                         <div className="space-y-3">
-                          {comments[post.id]?.map((comment) => (
-                            <div
-                              key={comment.id}
-                              className="bg-muted/50 rounded-lg p-3 animate-slide-up"
-                            >
-                              <div className="flex justify-between items-start mb-2">
-                                <span className="font-semibold text-sm">{comment.user_name}</span>
-                                <span className="text-xs text-muted-foreground">
-                                  {formatDistanceToNow(new Date(comment.created_at), { addSuffix: true })}
-                                </span>
-                              </div>
-                              <p className="text-sm">{comment.content}</p>
-                            </div>
-                          ))}
-                          {comments[post.id]?.length === 0 && (
+                          {renderComments(post.id)}
+                          {comments[post.id]?.filter(c => !c.parent_comment_id).length === 0 && (
                             <p className="text-sm text-muted-foreground text-center py-4">
                               Be the first to reply and show your support! 💙
                             </p>
