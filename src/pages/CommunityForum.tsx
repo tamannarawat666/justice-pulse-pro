@@ -1,144 +1,37 @@
-import { useState, useEffect } from 'react';
-import { useAuth } from '@/contexts/AuthContext';
-import { supabase } from '@/integrations/supabase/client';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Heart, MessageCircle, Send, Filter, Sparkles, ThumbsUp, Handshake, Scale } from 'lucide-react';
-import { useToast } from '@/hooks/use-toast';
-import { formatDistanceToNow } from 'date-fns';
-import confetti from "canvas-confetti/dist/confetti.module.mjs";
+import { useState, useEffect } from "react";
+import { useAuth } from "@/contexts/AuthContext";
+import { supabase } from "@/integrations/supabase/client";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Heart, MessageCircle, Send, Upload, Filter, X } from "lucide-react";
 
+export default function CommunityForum() {
+  const { user } = useAuth();
+  const [posts, setPosts] = useState([]);
+  const [newPost, setNewPost] = useState({
+    title: "",
+    content: "",
+    category: "",
+    location: "",
+    attachment: null,
+  });
+  const [selectedCategory, setSelectedCategory] = useState("All Topics");
+  const [selectedLocation, setSelectedLocation] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [typingUsers, setTypingUsers] = useState({});
 
-interface Post {
-  id: string;
-  title: string;
-  content: string;
-  category: string;
-  location: string | null;
-  likes_count: number;
-  created_at: string;
-  user_id: string;
-  profiles: {
-    full_name: string;
-  };
-  post_likes: { user_id: string }[];
-  comments: Comment[];
-}
-
-interface Comment {
-  id: string;
-  content: string;
-  created_at: string;
-  user_id: string;
-  profiles: {
-    full_name: string;
-  };
-}
-
-const CONVERSATION_STARTERS = [
-  "What legal topic are you curious about today?",
-  "Need advice or want to help someone near you?",
-  "Have you faced a legal challenge recently?",
-  "What's your experience with the justice system?",
-];
-
-const REACTION_EMOJIS = [
-  { emoji: '❤️', label: 'support', icon: Heart },
-  { emoji: '🙌', label: 'helpful', icon: ThumbsUp },
-  { emoji: '⚖️', label: 'justice', icon: Scale },
-  { emoji: '🤝', label: 'solidarity', icon: Handshake },
-];
-
-const CATEGORIES = [
-  'All',
-  'Family Law',
-  'Property',
-  'Cybercrime',
-  'Consumer Rights',
-  'Employment',
-  'Criminal',
-  'Other'
-];
-
-export default function Community() {
-  const { user, profile, isAuthenticated } = useAuth();
-  const { toast } = useToast();
-  
-  // Debug: Verify profile is available
-  console.log('Community - profile:', profile);
-  
-  const [posts, setPosts] = useState<Post[]>([]);
-  const [title, setTitle] = useState('');
-  const [content, setContent] = useState('');
-  const [category, setCategory] = useState('Family Law');
-  const [location, setLocation] = useState('');
-  const [filterCategory, setFilterCategory] = useState('All');
-  const [filterLocation, setFilterLocation] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [commentInputs, setCommentInputs] = useState<{ [key: string]: string }>({});
-  const [typingUsers, setTypingUsers] = useState<{ [key: string]: string }>({});
-  const [showStarter, setShowStarter] = useState(true);
-  const [currentStarter, setCurrentStarter] = useState(CONVERSATION_STARTERS[0]);
+  const categories = ["General", "Legal Advice", "Support", "Resources"];
+  const locations = ["Delhi", "Mumbai", "Bangalore", "Chennai", "Hyderabad"];
 
   useEffect(() => {
     fetchPosts();
-    subscribeToRealtimeUpdates();
-    
-    // Rotate conversation starters
-    const interval = setInterval(() => {
-      setCurrentStarter(CONVERSATION_STARTERS[Math.floor(Math.random() * CONVERSATION_STARTERS.length)]);
-    }, 8000);
-    
-    return () => clearInterval(interval);
-  }, []);
-
-  const subscribeToRealtimeUpdates = () => {
-    const postsChannel = supabase
-      .channel('posts-channel')
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'posts' },
-        () => {
-          fetchPosts();
-        }
-      )
-      .subscribe();
-
-    const commentsChannel = supabase
-      .channel('comments-channel')
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'comments' },
-        () => {
-          fetchPosts();
-        }
-      )
-      .subscribe();
-
-    const likesChannel = supabase
-      .channel('likes-channel')
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'post_likes' },
-        () => {
-          fetchPosts();
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(postsChannel);
-      supabase.removeChannel(commentsChannel);
-      supabase.removeChannel(likesChannel);
-    };
-  };
+  }, [selectedCategory, selectedLocation, searchQuery]);
 
   const fetchPosts = async () => {
-    const { data, error } = await supabase
-      .from('posts')
+    let query = supabase
+      .from("posts")
       .select(`
         *,
         profiles(full_name),
@@ -148,474 +41,209 @@ export default function Community() {
           profiles(full_name)
         )
       `)
-      .order('created_at', { ascending: false });
+      .order("created_at", { ascending: false });
 
-    if (error) {
-      console.error('Error fetching posts:', error);
-      return;
+    if (selectedCategory !== "All Topics") {
+      query = query.eq("category", selectedCategory);
     }
 
-    setPosts(data as any || []);
+    if (selectedLocation) {
+      query = query.ilike("location", `%${selectedLocation}%`);
+    }
+
+    if (searchQuery) {
+      query = query.or(`title.ilike.%${searchQuery}%,content.ilike.%${searchQuery}%`);
+    }
+
+    const { data, error } = await query;
+    if (!error) setPosts(data || []);
   };
 
-  const handleCreatePost = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleCreatePost = async () => {
+    if (!newPost.title || !newPost.content) return;
 
-    if (!isAuthenticated) {
-      toast({
-        title: 'Authentication Required',
-        description: 'Please login to create a post',
-        variant: 'destructive',
-      });
-      return;
+    let attachmentUrl = null;
+
+    if (newPost.attachment) {
+      const fileName = `${Date.now()}-${newPost.attachment.name}`;
+      const { data: fileData } = await supabase.storage
+        .from("attachments")
+        .upload(fileName, newPost.attachment);
+
+      attachmentUrl = fileData?.path || null;
     }
 
-    if (!title.trim() || !content.trim()) {
-      toast({
-        title: 'Error',
-        description: 'Please fill in all required fields',
-        variant: 'destructive',
-      });
-      return;
-    }
+    await supabase.from("posts").insert([
+      {
+        user_id: user?.id,
+        title: newPost.title,
+        content: newPost.content,
+        category: newPost.category,
+        location: newPost.location,
+        attachment_url: attachmentUrl,
+      },
+    ]);
 
-    setLoading(true);
-
-    const { error } = await supabase
-      .from('posts')
-      .insert({
-        user_id: user!.id,
-        title: title.trim(),
-        content: content.trim(),
-        category,
-        location: location.trim() || null,
-      });
-
-    if (error) {
-      toast({
-        title: 'Error',
-        description: 'Failed to create post',
-        variant: 'destructive',
-      });
-    } else {
-      toast({
-        title: 'Success',
-        description: 'Post created successfully',
-      });
-      setTitle('');
-      setContent('');
-      setLocation('');
-    }
-
-    setLoading(false);
+    setNewPost({ title: "", content: "", category: "", location: "", attachment: null });
+    fetchPosts();
   };
 
   const handleLike = async (postId: string) => {
-    if (!isAuthenticated) {
-      toast({
-        title: 'Authentication Required',
-        description: 'Please login to like posts',
-        variant: 'destructive',
-      });
-      return;
-    }
+    const { data: alreadyLiked } = await supabase
+      .from("post_likes")
+      .select("*")
+      .eq("post_id", postId)
+      .eq("user_id", user?.id)
+      .single();
 
-    const post = posts.find(p => p.id === postId);
-    const hasLiked = post?.post_likes.some(like => like.user_id === user!.id);
-
-    if (hasLiked) {
-      const { error } = await supabase
-        .from('post_likes')
-        .delete()
-        .eq('post_id', postId)
-        .eq('user_id', user!.id);
-
-      if (error) {
-        toast({
-          title: 'Error',
-          description: 'Failed to unlike post',
-          variant: 'destructive',
-        });
-      }
+    if (alreadyLiked) {
+      await supabase.from("post_likes").delete().eq("id", alreadyLiked.id);
     } else {
-      const { error } = await supabase
-        .from('post_likes')
-        .insert({ post_id: postId, user_id: user!.id });
-
-      if (error) {
-        toast({
-          title: 'Error',
-          description: 'Failed to like post',
-          variant: 'destructive',
-        });
-      }
+      await supabase.from("post_likes").insert([{ post_id: postId, user_id: user?.id }]);
     }
+
+    fetchPosts();
   };
 
-  const handleComment = async (postId: string) => {
-    if (!isAuthenticated) {
-      toast({
-        title: 'Authentication Required',
-        description: 'Please login to comment',
-        variant: 'destructive',
-      });
-      return;
-    }
+  const handleComment = async (postId: string, commentText: string) => {
+    if (!commentText.trim()) return;
 
-    const commentContent = commentInputs[postId]?.trim();
-    if (!commentContent) return;
-
-    const post = posts.find(p => p.id === postId);
-    const isFirstComment = post?.comments.length === 0;
-
-    const { error } = await supabase
-      .from('comments')
-      .insert({
+    await supabase.from("comments").insert([
+      {
+        user_id: user?.id,
         post_id: postId,
-        user_id: user!.id,
-        content: commentContent,
-      });
+        content: commentText,
+      },
+    ]);
 
-    if (error) {
-      toast({
-        title: 'Error',
-        description: 'Failed to add comment',
-        variant: 'destructive',
-      });
-    } else {
-      setCommentInputs(prev => ({ ...prev, [postId]: '' }));
-      
-      // Celebrate first comment!
-      if (isFirstComment) {
-        confetti({
-          particleCount: 100,
-          spread: 70,
-          origin: { y: 0.6 }
-        });
-        toast({
-          title: '🎉 First Reply!',
-          description: 'You just made someone\'s day! Thank you for being supportive.',
-        });
-      }
-    }
+    fetchPosts();
   };
-
-  const handleThankUser = (userName: string) => {
-    confetti({
-      particleCount: 50,
-      spread: 60,
-      origin: { y: 0.7 }
-    });
-    toast({
-      title: '💝 Gratitude Sent!',
-      description: `${userName} will feel the love. Thank you for spreading kindness!`,
-    });
-  };
-
-  const simulateTyping = (postId: string, userName: string) => {
-    setTypingUsers(prev => ({ ...prev, [postId]: userName }));
-    setTimeout(() => {
-      setTypingUsers(prev => {
-        const newState = { ...prev };
-        delete newState[postId];
-        return newState;
-      });
-    }, 3000);
-  };
-
-  const filteredPosts = posts.filter(post => {
-    const matchesCategory = filterCategory === 'All' || post.category === filterCategory;
-    const matchesLocation = !filterLocation || post.location?.toLowerCase().includes(filterLocation.toLowerCase());
-    return matchesCategory && matchesLocation;
-  });
-
-  const nearbyPosts = posts.filter(post => 
-    post.location && filterLocation && 
-    post.location.toLowerCase().includes(filterLocation.toLowerCase())
-  );
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-background via-secondary/10 to-background py-12 animate-fade-in">
-      <div className="container mx-auto px-4 max-w-4xl">
-        {/* Warm Personal Greeting */}
-        <div className="text-center mb-8 animate-scale-in">
-          <h1 className="text-4xl font-bold mb-3 bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent">
-            Welcome to Your Community 💙
-          </h1>
-          <p className="text-lg text-muted-foreground mb-4">
-            Hey {profile?.full_name || 'Friend'}, how's your day going? 
-            Want to share or explore something today?
-          </p>
-          
-          {/* Conversation Starter */}
-          {showStarter && (
-            <Card className="max-w-2xl mx-auto mb-6 border-primary/20 bg-primary/5 animate-fade-in">
-              <CardContent className="pt-6">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <Sparkles className="h-5 w-5 text-primary animate-pulse" />
-                    <p className="text-foreground font-medium">{currentStarter}</p>
-                  </div>
-                  <Button 
-                    variant="ghost" 
-                    size="sm"
-                    onClick={() => setShowStarter(false)}
-                  >
-                    ✕
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          )}
+    <div className="space-y-6 p-6 max-w-4xl mx-auto">
+      {/* CREATE POST FORM */}
+      <Card className="shadow-lg">
+        <CardHeader>
+          <CardTitle>Create a Post</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
 
-          {/* Nearby Activity Suggestions */}
-          {nearbyPosts.length > 0 && filterLocation && (
-            <Card className="max-w-2xl mx-auto mb-6 border-accent/30 bg-accent/5 animate-slide-in-right">
-              <CardContent className="pt-6">
-                <p className="text-sm text-foreground">
-                  🌍 <span className="font-semibold">{nearbyPosts.length}</span> people near you discussing{' '}
-                  <span className="text-primary font-semibold">
-                    {nearbyPosts[0]?.category}
-                  </span> in {filterLocation}
-                </p>
-              </CardContent>
-            </Card>
-          )}
-        </div>
-        
-        {isAuthenticated && (
-          <Card className="mb-8 shadow-lg hover:shadow-xl transition-all duration-300 border-primary/20">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Sparkles className="h-5 w-5 text-primary" />
-                Share Your Story & Help Others
-              </CardTitle>
-              <p className="text-sm text-muted-foreground">
-                Your voice matters. Every experience shared helps someone feel less alone. 💪
-              </p>
-            </CardHeader>
-            <CardContent>
-              <form onSubmit={handleCreatePost} className="space-y-4">
-                <Input
-                  placeholder="Post Title"
-                  value={title}
-                  onChange={(e) => setTitle(e.target.value)}
-                  maxLength={200}
-                />
-                <Textarea
-                  placeholder="Share your story, ask for advice, or support others..."
-                  value={content}
-                  onChange={(e) => setContent(e.target.value)}
-                  rows={4}
-                  maxLength={2000}
-                />
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <Select value={category} onValueChange={setCategory}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select Category" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {CATEGORIES.filter(cat => cat !== 'All').map(cat => (
-                        <SelectItem key={cat} value={cat}>{cat}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <Input
-                    placeholder="Location (optional)"
-                    value={location}
-                    onChange={(e) => setLocation(e.target.value)}
-                    maxLength={100}
-                  />
-                </div>
-                <Button type="submit" disabled={loading} className="w-full hover-scale">
-                  {loading ? 'Sharing your story...' : '✨ Share with Community'}
-                </Button>
-              </form>
-            </CardContent>
-          </Card>
-        )}
+          <Input
+            placeholder="Title"
+            value={newPost.title}
+            onChange={(e) => setNewPost({ ...newPost, title: e.target.value })}
+          />
 
-        <Card className="mb-6 shadow-md border-primary/10">
-          <CardContent className="pt-6">
-            <div className="flex items-center gap-4 flex-wrap">
-              <Filter className="h-5 w-5 text-primary" />
-              <span className="text-sm font-medium">Find what matters to you:</span>
-              <Select value={filterCategory} onValueChange={setFilterCategory}>
-                <SelectTrigger className="w-[180px]">
-                  <SelectValue placeholder="Category" />
-                </SelectTrigger>
-                <SelectContent>
-                  {CATEGORIES.map(cat => (
-                    <SelectItem key={cat} value={cat}>{cat}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <Input
-                placeholder="🌍 Your location..."
-                value={filterLocation}
-                onChange={(e) => setFilterLocation(e.target.value)}
-                className="max-w-xs"
+          <Textarea
+            placeholder="Share your thoughts..."
+            value={newPost.content}
+            onChange={(e) => setNewPost({ ...newPost, content: e.target.value })}
+          />
+
+          <div className="flex gap-2">
+            <Input
+              placeholder="Category (ex: Support)"
+              value={newPost.category}
+              onChange={(e) => setNewPost({ ...newPost, category: e.target.value })}
+            />
+            <Input
+              placeholder="Location (ex: Delhi)"
+              value={newPost.location}
+              onChange={(e) => setNewPost({ ...newPost, location: e.target.value })}
+            />
+          </div>
+
+          <div className="flex items-center gap-2">
+            <label className="flex items-center gap-2 cursor-pointer">
+              <Upload size={18} />
+              <span>Attach File (optional)</span>
+              <input
+                type="file"
+                hidden
+                onChange={(e) => setNewPost({ ...newPost, attachment: e.target.files?.[0] || null })}
               />
+            </label>
+
+            {newPost.attachment && (
+              <div className="flex items-center gap-1 text-sm bg-gray-200 px-2 py-1 rounded-full">
+                {newPost.attachment.name}
+                <X
+                  className="cursor-pointer"
+                  size={16}
+                  onClick={() => setNewPost({ ...newPost, attachment: null })}
+                />
+              </div>
+            )}
+          </div>
+
+          <Button onClick={handleCreatePost} className="w-full">
+            Post
+          </Button>
+        </CardContent>
+      </Card>
+
+      {/* FILTERS */}
+      <div className="flex gap-3">
+        <Input placeholder="Search..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
+        <Button variant="outline">
+          <Filter size={18} />
+        </Button>
+      </div>
+
+      {/* POSTS LIST */}
+      {posts.map((post: any) => (
+        <Card key={post.id} className="shadow-md">
+          <CardContent className="pt-4">
+            <h3 className="font-semibold text-lg">{post.title}</h3>
+            <p className="text-gray-700">{post.content}</p>
+
+            {post.attachment_url && (
+              <a
+                href={supabase.storage.from("attachments").getPublicUrl(post.attachment_url).data.publicUrl}
+                target="_blank"
+                className="text-blue-600 underline"
+              >
+                View Attachment
+              </a>
+            )}
+
+            <div className="flex gap-4 mt-4">
+              <Button variant="ghost" onClick={() => handleLike(post.id)}>
+                <Heart className={post.post_likes?.some((l: any) => l.user_id === user?.id) ? "text-red-500" : ""} />
+                {post.post_likes?.length || 0}
+              </Button>
+
+              <Button variant="ghost">
+                <MessageCircle /> {post.comments?.length || 0}
+              </Button>
             </div>
+
+            {/* COMMENT INPUT */}
+            <div className="flex mt-3 gap-2">
+              <Input
+                placeholder="Write a comment..."
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") handleComment(post.id, e.currentTarget.value);
+                }}
+              />
+              <Button>
+                <Send size={16} />
+              </Button>
+            </div>
+
+            {/* COMMENTS */}
+            <div className="mt-3 space-y-2">
+              {post.comments?.map((comment: any) => (
+                <div key={comment.id} className="bg-gray-100 p-2 rounded-md">
+                  <p className="font-semibold">{comment.profiles?.full_name || "User"}</p>
+                  <p>{comment.content}</p>
+                </div>
+              ))}
+            </div>
+
           </CardContent>
         </Card>
-
-        <div className="space-y-6">
-          {filteredPosts.length === 0 ? (
-            <Card className="shadow-md animate-fade-in">
-              <CardContent className="py-16 text-center">
-                <Sparkles className="h-12 w-12 mx-auto mb-4 text-primary/50 animate-pulse" />
-                <p className="text-lg text-muted-foreground mb-2">
-                  {isAuthenticated 
-                    ? 'No posts yet. Be the brave first voice! 💙' 
-                    : 'Join us to see stories & support your community! 🌟'}
-                </p>
-              </CardContent>
-            </Card>
-          ) : (
-            filteredPosts.map((post, index) => (
-              <Card 
-                key={post.id} 
-                className="shadow-lg hover:shadow-xl transition-all duration-300 border-l-4 border-l-primary/50 hover:border-l-primary animate-fade-in"
-                style={{ animationDelay: `${index * 0.1}s` }}
-              >
-                <CardHeader>
-                  <div className="flex justify-between items-start">
-                    <div className="flex-1">
-                      <CardTitle className="text-xl mb-2">{post.title}</CardTitle>
-                      <div className="flex items-center gap-3 text-sm text-muted-foreground">
-                        <span className="font-medium">{post.profiles?.full_name || 'Anonymous'}</span>
-                        <span>•</span>
-                        <span>{formatDistanceToNow(new Date(post.created_at), { addSuffix: true })}</span>
-                        {post.location && (
-                          <>
-                            <span>•</span>
-                            <span>{post.location}</span>
-                          </>
-                        )}
-                      </div>
-                    </div>
-                    <span className="px-3 py-1 bg-primary/10 text-primary rounded-full text-xs font-medium">
-                      {post.category}
-                    </span>
-                  </div>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <p className="text-foreground whitespace-pre-wrap leading-relaxed">{post.content}</p>
-                  
-                  {/* Reaction Emojis */}
-                  <div className="flex items-center gap-2 pt-2 border-t flex-wrap">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => handleLike(post.id)}
-                      className="gap-2 hover-scale transition-all"
-                    >
-                      <Heart
-                        className={`h-4 w-4 transition-all ${
-                          post.post_likes.some(like => like.user_id === user?.id)
-                            ? 'fill-red-500 text-red-500 scale-110'
-                            : ''
-                        }`}
-                      />
-                      <span className="font-medium">{post.post_likes.length}</span>
-                    </Button>
-                    <Button variant="ghost" size="sm" className="gap-2">
-                      <MessageCircle className="h-4 w-4" />
-                      <span className="font-medium">{post.comments.length}</span>
-                    </Button>
-                    
-                    {/* Thank Button */}
-                    {isAuthenticated && post.user_id !== user?.id && (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleThankUser(post.profiles?.full_name || 'them')}
-                        className="gap-2 hover-scale ml-auto"
-                      >
-                        <Handshake className="h-4 w-4 text-primary" />
-                        <span className="text-primary font-medium">Thank Them 💝</span>
-                      </Button>
-                    )}
-                  </div>
-                  
-                  {/* Typing Indicator */}
-                  {typingUsers[post.id] && (
-                    <div className="text-sm text-muted-foreground italic animate-pulse flex items-center gap-2">
-                      <div className="flex gap-1">
-                        <span className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></span>
-                        <span className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></span>
-                        <span className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></span>
-                      </div>
-                      {typingUsers[post.id]} is replying...
-                    </div>
-                  )}
-
-                  {post.comments.length > 0 && (
-                    <div className="space-y-3 pt-4 border-t">
-                      <p className="text-sm font-medium text-muted-foreground mb-3">
-                        💬 {post.comments.length} {post.comments.length === 1 ? 'supportive reply' : 'supportive replies'}
-                      </p>
-                      {post.comments.map((comment, idx) => (
-                        <div 
-                          key={comment.id} 
-                          className="bg-gradient-to-r from-secondary/40 to-secondary/20 rounded-lg p-4 hover:shadow-md transition-all animate-fade-in"
-                          style={{ animationDelay: `${idx * 0.05}s` }}
-                        >
-                          <div className="flex items-center justify-between mb-2">
-                            <div className="flex items-center gap-2">
-                              <span className="font-semibold text-sm text-primary">
-                                {comment.profiles?.full_name || 'Anonymous'}
-                              </span>
-                              <span className="text-xs text-muted-foreground">
-                                {formatDistanceToNow(new Date(comment.created_at), { addSuffix: true })}
-                              </span>
-                            </div>
-                          </div>
-                          <p className="text-sm leading-relaxed">{comment.content}</p>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-
-                  {isAuthenticated && (
-                    <div className="flex gap-2 pt-4 border-t">
-                      <Input
-                        placeholder="💬 Share support, advice, or encouragement..."
-                        value={commentInputs[post.id] || ''}
-                        onChange={(e) => {
-                          setCommentInputs(prev => ({ ...prev, [post.id]: e.target.value }));
-                          if (e.target.value.length > 2) {
-                            simulateTyping(post.id, profile?.full_name || 'Someone');
-                          }
-                        }}
-                        maxLength={500}
-                        className="transition-all focus:ring-2 focus:ring-primary"
-                      />
-                      <Button
-                        size="icon"
-                        onClick={() => handleComment(post.id)}
-                        disabled={!commentInputs[post.id]?.trim()}
-                        className="hover-scale"
-                      >
-                        <Send className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  )}
-                  
-                  {!isAuthenticated && (
-                    <div className="pt-4 border-t text-center">
-                      <p className="text-sm text-muted-foreground">
-                        💙 <Button variant="link" className="text-primary p-0">Login</Button> to join the conversation and support others
-                      </p>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            ))
-          )}
-        </div>
-      </div>
+      ))}
     </div>
   );
 }

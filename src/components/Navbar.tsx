@@ -1,5 +1,6 @@
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
+import { NotificationBell } from '@/components/NotificationBell';
 import { 
   Home, 
   FileText, 
@@ -68,6 +69,7 @@ const Navbar = () => {
           </div>
 
           <div className="flex items-center space-x-2">
+            {isAuthenticated && <NotificationBell />}
             {isAuthenticated ? (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
