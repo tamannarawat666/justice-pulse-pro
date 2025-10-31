@@ -1,19 +1,36 @@
-const multer = require('multer');
-const fs = require('fs');
-const pdfParse = require('pdf-parse');
+import fetch from 'node-fetch';
+import fs from 'fs';
+import path from 'path';
 
-// Folder to temporarily store uploaded PDFs
-const upload = multer({ dest: 'uploads/' });
+const PYTHON_SERVER_URL = 'http://127.0.0.1:8000/summarize'; // Python summarizer server
 
-// Function to extract PDF text
-async function extractPDF(filePath) {
-    const pdfBuffer = fs.readFileSync(filePath);
-    const data = await pdfParse(pdfBuffer);
+export async function summarizeFile(filePath, filename) {
+  try {
+    const FormData = (await import('form-data')).default; // dynamic import for ES modules
+    const formData = new FormData();
+    formData.append('file', fs.createReadStream(filePath), filename);
 
-    // Delete the PDF after reading
-    fs.unlinkSync(filePath);
+    const response = await fetch(PYTHON_SERVER_URL, {
+      method: 'POST',
+      body: formData,
+    });
 
-    return data.text;
+    if (!response.ok) {
+      throw new Error(`Python summarizer error: ${response.statusText}`);
+    }
+
+    const data = await response.json();
+    return data;
+
+  } catch (err) {
+    console.error('Error in summarizeFile:', err.message);
+    throw err;
+  } finally {
+    // Optional: delete the uploaded file after summarization
+    try {
+      fs.unlinkSync(filePath);
+    } catch (err) {
+      console.warn('Failed to delete uploaded file:', filePath);
+    }
+  }
 }
-
-module.exports = { extractPDF, upload };

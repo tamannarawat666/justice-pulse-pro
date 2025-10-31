@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -8,7 +8,7 @@ import { Calendar, Clock, MapPin, AlertCircle, Plus } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 interface Hearing {
-  id: string;
+  _id: string;
   caseTitle: string;
   date: string;
   time: string;
@@ -16,72 +16,71 @@ interface Hearing {
   type: string;
 }
 
-// Generate mock hearings for 2023–2027
-const generateMockHearings = (): Hearing[] => {
-  const hearings: Hearing[] = [];
-  const courts = ['District Court', 'Consumer Forum', 'Labour Court', 'High Court'];
-  const types = ['Main Hearing', 'Evidence Submission', 'Final Arguments', 'Preliminary Hearing'];
-  for (let year = 2023; year <= 2027; year++) {
-    for (let i = 1; i <= 3; i++) {
-      const dateObj = new Date(year, Math.floor(Math.random() * 12), Math.floor(Math.random() * 28) + 1, 9 + i, 0);
-      hearings.push({
-        id: `${year}-${i}`,
-        caseTitle: `Sample Case ${i} (${year})`,
-        date: dateObj.toLocaleDateString(),
-        time: dateObj.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        court: `${courts[Math.floor(Math.random() * courts.length)]}, City`,
-        type: types[Math.floor(Math.random() * types.length)],
-      });
-    }
-  }
-  return hearings;
-};
-
 const CourtTracker = () => {
   const [caseName, setCaseName] = useState("");
   const [courtDate, setCourtDate] = useState("");
   const [userEmail, setUserEmail] = useState("");
+  const [phonenumber, setPhoneNumber] = useState("");  // ✅ ADDED
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [hearings, setHearings] = useState<Hearing[]>(generateMockHearings());
+  const [hearings, setHearings] = useState<Hearing[]>([]);
+
   const { toast } = useToast();
 
-  const handleAddReminder = (e: React.FormEvent) => {
+  // Fetch Hearings from backend
+  useEffect(() => {
+    fetch("http://localhost:5000/hearings")
+      .then((res) => res.json())
+      .then((data) => setHearings(data))
+      .catch((err) => console.error("Error fetching hearings:", err));
+  }, []);
+
+  const handleAddReminder = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
 
-    try {
-      if (!caseName || !courtDate || !userEmail) {
-        toast({
-          title: "Error",
-          description: "Please fill all fields",
-          variant: "destructive",
-        });
-        setIsSubmitting(false);
-        return;
-      }
-
-      const dateObj = new Date(courtDate);
-
-      const newHearing: Hearing = {
-        id: Math.random().toString(),
-        caseTitle: caseName,
-        date: dateObj.toLocaleDateString(),
-        time: dateObj.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        court: "Court details pending",
-        type: "Hearing",
-      };
-
-      setHearings([newHearing, ...hearings]);
-
-      // Reset form
-      setCaseName("");
-      setCourtDate("");
-      setUserEmail("");
-
+    if (!caseName || !courtDate || !userEmail || !phonenumber) {
       toast({
-        title: "Success",
-        description: "Court reminder added successfully",
+        title: "Error",
+        description: "Please fill all fields",
+        variant: "destructive",
       });
+      setIsSubmitting(false);
+      return;
+    }
+
+    const newHearing = {
+  caseTitle: caseName,
+  date: courtDate,   // ✅ Fix field name
+  time: new Date(courtDate).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+  court: "Court details pending",
+  type: "Hearing",
+  userEmail,
+  phonenumber,
+};
+
+
+    try {
+      const response = await fetch("http://localhost:5000/hearings/add", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(newHearing),
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        setHearings((prev) => [result.hearing, ...prev]);
+
+        toast({
+          title: "Success",
+          description: "Court reminder added successfully",
+        });
+
+        // Reset fields
+        setCaseName("");
+        setCourtDate("");
+        setUserEmail("");
+        setPhoneNumber(""); // ✅ RESET PHONE NUMBER
+      }
     } catch (err) {
       console.error(err);
       toast({
@@ -89,9 +88,9 @@ const CourtTracker = () => {
         description: "Failed to add court reminder. Please try again.",
         variant: "destructive",
       });
-    } finally {
-      setIsSubmitting(false);
     }
+
+    setIsSubmitting(false);
   };
 
   return (
@@ -102,7 +101,6 @@ const CourtTracker = () => {
       </div>
 
       <div className="grid gap-6 mb-8">
-        {/* Add Reminder Form */}
         <Card className="bg-accent/5 border-accent/20">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -112,7 +110,7 @@ const CourtTracker = () => {
           </CardHeader>
           <CardContent>
             <form onSubmit={handleAddReminder} className="space-y-4">
-              <div className="grid md:grid-cols-3 gap-4">
+              <div className="grid md:grid-cols-4 gap-4"> {/* ✅ 4 fields now */}
                 <div className="space-y-2">
                   <Label htmlFor="caseName">Case Name</Label>
                   <Input
@@ -123,6 +121,7 @@ const CourtTracker = () => {
                     required
                   />
                 </div>
+
                 <div className="space-y-2">
                   <Label htmlFor="courtDate">Court Date & Time</Label>
                   <Input
@@ -133,6 +132,7 @@ const CourtTracker = () => {
                     required
                   />
                 </div>
+
                 <div className="space-y-2">
                   <Label htmlFor="email">Your Email</Label>
                   <Input
@@ -144,7 +144,21 @@ const CourtTracker = () => {
                     required
                   />
                 </div>
+
+                {/* ✅ NEW PHONE NUMBER FIELD */}
+                <div className="space-y-2">
+                  <Label htmlFor="phoneNumber">Phone Number</Label>
+                  <Input
+                    id="phoneNumber"
+                    type="text"
+                    value={phonenumber}
+                    onChange={(e) => setPhoneNumber(e.target.value)}
+                    placeholder="Enter your phone number"
+                    required
+                  />
+                </div>
               </div>
+
               <Button type="submit" disabled={isSubmitting} className="w-full">
                 {isSubmitting ? "Adding Reminder..." : "Add Reminder"}
               </Button>
@@ -169,9 +183,9 @@ const CourtTracker = () => {
 
         {/* Hearings List */}
         {hearings.map((hearing) => (
-          <Card key={hearing.id} className="hover:shadow-lg transition-shadow">
+          <Card key={hearing._id} className="hover:shadow-lg transition-shadow">
             <CardHeader>
-              <div className="flex items-start justify-between">
+              <div className="flex itemsstart justify-between">
                 <div>
                   <CardTitle className="text-xl mb-2">{hearing.caseTitle}</CardTitle>
                   <Badge variant="outline">{hearing.type}</Badge>
@@ -207,21 +221,6 @@ const CourtTracker = () => {
           </Card>
         ))}
       </div>
-
-      {/* Calendar View */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Calendar View</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="bg-muted/30 h-96 rounded-lg flex items-center justify-center">
-            <div className="text-center">
-              <Calendar className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-              <p className="text-muted-foreground">Calendar view of all hearings (2023–2027) is active</p>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
     </div>
   );
 };

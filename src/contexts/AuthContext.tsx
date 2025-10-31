@@ -1,4 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import { supabase } from '@/integrations/supabase/client';
+import { useToast } from '@/components/ui/use-toast';
 
 interface User {
   id: string;
@@ -18,53 +20,102 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
+  const { toast } = useToast();
 
   useEffect(() => {
-    const storedUser = localStorage.getItem('justice_hub_user');
-    if (storedUser) {
-      setUser(JSON.parse(storedUser));
-    }
+    // Check for existing session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session?.user) {
+        setUser({
+          id: session.user.id,
+          email: session.user.email!,
+          name: session.user.user_metadata?.name || session.user.email!.split('@')[0]
+        });
+      }
+    });
+
+    // Listen for auth changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session?.user) {
+        setUser({
+          id: session.user.id,
+          email: session.user.email!,
+          name: session.user.user_metadata?.name || session.user.email!.split('@')[0]
+        });
+      } else {
+        setUser(null);
+      }
+    });
+
+    return () => subscription.unsubscribe();
   }, []);
 
   const login = async (email: string, password: string): Promise<boolean> => {
-    const users = JSON.parse(localStorage.getItem('justice_hub_users') || '[]');
-    const foundUser = users.find((u: any) => u.email === email && u.password === password);
-    
-    if (foundUser) {
-      const userWithoutPassword = { id: foundUser.id, name: foundUser.name, email: foundUser.email };
-      setUser(userWithoutPassword);
-      localStorage.setItem('justice_hub_user', JSON.stringify(userWithoutPassword));
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
+
+    if (error) {
+      toast({
+        title: "Login failed",
+        description: error.message,
+        variant: "destructive"
+      });
+      return false;
+    }
+
+    if (data.user) {
+      setUser({
+        id: data.user.id,
+        email: data.user.email!,
+        name: data.user.user_metadata?.name || data.user.email!.split('@')[0]
+      });
       return true;
     }
+    
     return false;
   };
 
   const signup = async (name: string, email: string, password: string): Promise<boolean> => {
-    const users = JSON.parse(localStorage.getItem('justice_hub_users') || '[]');
-    
-    if (users.some((u: any) => u.email === email)) {
+    const { data, error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        data: {
+          name: name
+        }
+      }
+    });
+
+    if (error) {
+      toast({
+        title: "Signup failed",
+        description: error.message,
+        variant: "destructive"
+      });
       return false;
     }
 
-    const newUser = {
-      id: Date.now().toString(),
-      name,
-      email,
-      password,
-    };
+    if (data.user) {
+      setUser({
+        id: data.user.id,
+        email: data.user.email!,
+        name: name
+      });
+      toast({
+        title: "Welcome! 🎉",
+        description: "Your account has been created successfully.",
+      });
+      return true;
+    }
 
-    users.push(newUser);
-    localStorage.setItem('justice_hub_users', JSON.stringify(users));
-    
-    const userWithoutPassword = { id: newUser.id, name: newUser.name, email: newUser.email };
-    setUser(userWithoutPassword);
-    localStorage.setItem('justice_hub_user', JSON.stringify(userWithoutPassword));
-    return true;
+    return false;
   };
 
-  const logout = () => {
+  const logout = async () => {
+    await supabase.auth.signOut();
     setUser(null);
-    localStorage.removeItem('justice_hub_user');
   };
 
   return (
