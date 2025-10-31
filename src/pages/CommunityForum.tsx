@@ -29,6 +29,48 @@ export default function CommunityForum() {
 
   useEffect(() => {
     fetchPosts();
+
+    // Real-time subscription for new posts and updates
+    const channel = supabase
+      .channel('posts-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'posts',
+        },
+        () => {
+          fetchPosts();
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'comments',
+        },
+        () => {
+          fetchPosts();
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'post_likes',
+        },
+        () => {
+          fetchPosts();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, [selectedCategory, selectedLocation, searchQuery]);
 
   const fetchPosts = async () => {
@@ -62,12 +104,7 @@ export default function CommunityForum() {
   };
 
   const handleCreatePost = async () => {
-    if (!newPost.title || !newPost.content) {
-      toast({
-        title: "Missing information",
-        description: "Please add a title and share your thoughts 💙",
-        variant: "destructive"
-      });
+    if (!newPost.content) {
       return;
     }
 
@@ -76,31 +113,27 @@ export default function CommunityForum() {
     if (newPost.attachment) {
       const fileName = `${Date.now()}-${newPost.attachment.name}`;
       const { data: fileData } = await supabase.storage
-        .from("attachments")
+        .from("forum-attachments")
         .upload(fileName, newPost.attachment);
 
       attachmentUrl = fileData?.path || null;
     }
 
+    // Insert post - it will appear instantly via real-time subscription
     await supabase.from("posts").insert([
       {
         user_id: user?.id,
         user_name: user?.name || "Anonymous",
-        title: newPost.title,
+        title: newPost.title || "Untitled",
         content: newPost.content,
-        category: newPost.category,
+        category: newPost.category || "General",
         location: newPost.location,
         attachment_url: attachmentUrl,
       },
     ]);
 
+    // Clear form immediately (Twitter-style)
     setNewPost({ title: "", content: "", category: "", location: "", attachment: null });
-    fetchPosts();
-    
-    toast({
-      title: "Thank you for sharing ❤️",
-      description: "Someone will connect with you soon. You're heard and valued.",
-    });
   };
 
   const handleLike = async (postId: string) => {
@@ -136,215 +169,225 @@ export default function CommunityForum() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-background to-accent/5">
-      <div className="max-w-4xl mx-auto p-6 space-y-6">
+    <div className="min-h-screen bg-gradient-to-b from-background via-background to-accent/5">
+      <div className="max-w-2xl mx-auto px-4 py-6 space-y-6">
+        
         {/* WARM PERSONAL GREETING */}
-        <Card className="border-none shadow-lg bg-gradient-to-br from-card to-card/50 backdrop-blur">
-          <CardContent className="pt-6">
-            <h1 className="text-3xl font-bold mb-2">
-              Hey, {user?.name || "Friend"} 👋
-            </h1>
-            <p className="text-lg text-muted-foreground mb-4">
-              How's your day going? Want to share something or explore what others are talking about today?
-            </p>
-            
-            {/* CONVERSATION STARTERS */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              <div className="p-4 rounded-xl bg-accent/30 hover:bg-accent/50 transition-colors cursor-pointer border border-border/50">
-                <p className="text-sm font-medium">💭 What legal topic are you curious about today?</p>
-              </div>
-              <div className="p-4 rounded-xl bg-accent/30 hover:bg-accent/50 transition-colors cursor-pointer border border-border/50">
-                <p className="text-sm font-medium">🤝 Need advice or want to help someone near you?</p>
-              </div>
-              <div className="p-4 rounded-xl bg-accent/30 hover:bg-accent/50 transition-colors cursor-pointer border border-border/50">
-                <p className="text-sm font-medium">💙 Feeling overwhelmed? You're safe here — tell us what's going on.</p>
-              </div>
-              <div className="p-4 rounded-xl bg-accent/30 hover:bg-accent/50 transition-colors cursor-pointer border border-border/50">
-                <p className="text-sm font-medium">✨ Have a small win today? Share and inspire others</p>
-              </div>
+        <div className="text-center py-8">
+          <h1 className="text-4xl font-bold mb-2">
+            Hey, {user?.name || "Friend"} 👋
+          </h1>
+          <p className="text-lg text-muted-foreground mb-6">
+            How are you feeling today? Want to share something or explore what others are talking about?
+          </p>
+          
+          {/* CONVERSATION STARTERS */}
+          <div className="flex flex-wrap justify-center gap-3 mb-6">
+            <div className="px-4 py-2 rounded-full bg-accent/40 hover:bg-accent/60 transition-all cursor-pointer text-sm border border-border/50">
+              💭 What legal topic are you curious about?
             </div>
-          </CardContent>
-        </Card>
-
-        {/* CREATE POST FORM */}
-        <Card className="border-none shadow-xl bg-card/80 backdrop-blur">
-          <CardHeader>
-            <CardTitle className="text-2xl">Share Your Story</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <Input
-              placeholder="What would you like to share? ✨"
-              value={newPost.title}
-              onChange={(e) => setNewPost({ ...newPost, title: e.target.value })}
-              className="border-border/50 focus:border-primary rounded-xl"
-            />
-
-            <Textarea
-              placeholder="Share what's on your mind… You're in a safe space here. 💙"
-              value={newPost.content}
-              onChange={(e) => setNewPost({ ...newPost, content: e.target.value })}
-              className="min-h-[120px] border-border/50 focus:border-primary rounded-xl resize-none"
-            />
-
-            <div className="flex gap-2">
-              <Input
-                placeholder="Topic (e.g., Support, Legal Advice)"
-                value={newPost.category}
-                onChange={(e) => setNewPost({ ...newPost, category: e.target.value })}
-                className="border-border/50 focus:border-primary rounded-xl"
-              />
-              <Input
-                placeholder="Location (optional)"
-                value={newPost.location}
-                onChange={(e) => setNewPost({ ...newPost, location: e.target.value })}
-                className="border-border/50 focus:border-primary rounded-xl"
-              />
+            <div className="px-4 py-2 rounded-full bg-accent/40 hover:bg-accent/60 transition-all cursor-pointer text-sm border border-border/50">
+              🤝 Need advice or want to help?
             </div>
-
-            <div className="flex items-center gap-2">
-              <label className="flex items-center gap-2 cursor-pointer px-4 py-2 rounded-xl bg-accent/50 hover:bg-accent transition-colors">
-                <Upload size={18} />
-                <span className="text-sm">Attach File (optional)</span>
-                <input
-                  type="file"
-                  hidden
-                  onChange={(e) => setNewPost({ ...newPost, attachment: e.target.files?.[0] || null })}
-                />
-              </label>
-
-              {newPost.attachment && (
-                <div className="flex items-center gap-2 text-sm bg-accent px-3 py-2 rounded-full border border-border">
-                  <span>{newPost.attachment.name}</span>
-                  <X
-                    className="cursor-pointer hover:text-destructive"
-                    size={16}
-                    onClick={() => setNewPost({ ...newPost, attachment: null })}
-                  />
-                </div>
-              )}
+            <div className="px-4 py-2 rounded-full bg-accent/40 hover:bg-accent/60 transition-all cursor-pointer text-sm border border-border/50">
+              💙 What&apos;s on your mind?
             </div>
+          </div>
 
-            <Button 
-              onClick={handleCreatePost} 
-              className="w-full rounded-xl font-medium text-base h-12"
-            >
-              Share with Community 💬
-            </Button>
-          </CardContent>
-        </Card>
-
-        {/* FILTERS */}
-        <div className="flex gap-3">
-          <Input 
-            placeholder="Search for topics or keywords..." 
-            value={searchQuery} 
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="rounded-xl border-border/50"
-          />
-          <Button variant="outline" className="rounded-xl">
-            <Filter size={18} />
-          </Button>
+          {/* ENCOURAGING MESSAGE */}
+          <p className="text-sm text-muted-foreground/70 italic">
+            Your voice matters here. Someone may relate to your story.
+          </p>
         </div>
 
-        {/* POSTS LIST */}
-        {posts.map((post: any) => (
-          <Card key={post.id} className="border-none shadow-lg hover:shadow-xl transition-shadow bg-card/80 backdrop-blur">
-            <CardContent className="pt-6">
-              <div className="flex items-start gap-3 mb-4">
-                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary/20 to-primary/40 flex items-center justify-center text-lg font-semibold">
-                  {(post.user_name || "?").charAt(0).toUpperCase()}
-                </div>
-                <div className="flex-1">
-                  <h3 className="font-bold text-xl mb-1">{post.title}</h3>
-                  <p className="text-sm text-muted-foreground">{post.user_name || "Anonymous"} • {post.category}</p>
-                </div>
+        {/* CREATE POST (TWITTER-STYLE COMPACT) */}
+        <Card className="border-border/50 shadow-lg bg-card/90 backdrop-blur">
+          <CardContent className="pt-6">
+            <div className="flex gap-3">
+              <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary/30 to-primary/50 flex items-center justify-center text-lg font-semibold flex-shrink-0">
+                {(user?.name || "?").charAt(0).toUpperCase()}
               </div>
-
-              <p className="text-foreground/90 leading-relaxed mb-4">{post.content}</p>
-
-              {post.attachment_url && (
-                <a
-                  href={supabase.storage.from("forum-attachments").getPublicUrl(post.attachment_url).data.publicUrl}
-                  target="_blank"
-                  className="inline-flex items-center gap-2 text-primary hover:underline text-sm mb-4"
-                >
-                  📎 View Attachment
-                </a>
-              )}
-
-              <div className="flex gap-3 mt-4 pt-4 border-t border-border/50">
-                <Button 
-                  variant="ghost" 
-                  onClick={() => handleLike(post.id)}
-                  className="rounded-full hover:bg-red-50 dark:hover:bg-red-950/20 gap-2"
-                >
-                  <Heart 
-                    className={post.post_likes?.some((l: any) => l.user_id === user?.id) ? "fill-red-500 text-red-500" : "text-muted-foreground"} 
-                    size={20}
-                  />
-                  <span className="text-sm">{post.post_likes?.length || 0} {(post.post_likes?.length || 0) === 1 ? "person" : "people"} care</span>
-                </Button>
-
-                <Button variant="ghost" className="rounded-full gap-2">
-                  <MessageCircle size={20} className="text-muted-foreground" />
-                  <span className="text-sm">{post.comments?.length || 0} {(post.comments?.length || 0) === 1 ? "reply" : "replies"}</span>
-                </Button>
-              </div>
-
-              {/* COMMENT INPUT */}
-              <div className="flex mt-4 gap-2">
-                <Input
-                  placeholder="Write a kind reply… ❤️"
-                  className="rounded-xl border-border/50"
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" && e.currentTarget.value.trim()) {
-                      handleComment(post.id, e.currentTarget.value);
-                      e.currentTarget.value = "";
-                    }
-                  }}
+              
+              <div className="flex-1 space-y-3">
+                <Textarea
+                  placeholder="Share what's on your mind… 💭"
+                  value={newPost.content}
+                  onChange={(e) => setNewPost({ ...newPost, content: e.target.value })}
+                  className="min-h-[100px] border-0 focus-visible:ring-0 focus-visible:ring-offset-0 resize-none text-base bg-transparent p-0"
                 />
-                <Button 
-                  className="rounded-xl"
-                  onClick={(e) => {
-                    const input = e.currentTarget.previousElementSibling as HTMLInputElement;
-                    if (input.value.trim()) {
-                      handleComment(post.id, input.value);
-                      input.value = "";
-                    }
-                  }}
-                >
-                  <Send size={16} />
-                </Button>
-              </div>
 
-              {/* COMMENTS */}
-              {post.comments && post.comments.length > 0 && (
-                <div className="mt-4 space-y-3">
-                  {post.comments.map((comment: any) => (
-                    <div 
-                      key={comment.id} 
-                      className="bg-accent/30 p-4 rounded-xl border border-border/30"
-                    >
-                      <p className="font-semibold text-sm mb-1">{comment.user_name || "Anonymous"}</p>
-                      <p className="text-foreground/80">{comment.content}</p>
-                    </div>
-                  ))}
+                {/* OPTIONAL FIELDS - COLLAPSIBLE */}
+                <div className="flex gap-2">
+                  <Input
+                    placeholder="Topic (optional)"
+                    value={newPost.category}
+                    onChange={(e) => setNewPost({ ...newPost, category: e.target.value })}
+                    className="text-sm border-border/50 rounded-full h-9"
+                  />
+                  <Input
+                    placeholder="Location"
+                    value={newPost.location}
+                    onChange={(e) => setNewPost({ ...newPost, location: e.target.value })}
+                    className="text-sm border-border/50 rounded-full h-9"
+                  />
                 </div>
-              )}
 
-            </CardContent>
-          </Card>
-        ))}
+                {newPost.attachment && (
+                  <div className="flex items-center gap-2 text-sm bg-accent/50 px-3 py-2 rounded-full border border-border/50 w-fit">
+                    <span className="truncate max-w-[200px]">{newPost.attachment.name}</span>
+                    <X
+                      className="cursor-pointer hover:text-destructive flex-shrink-0"
+                      size={16}
+                      onClick={() => setNewPost({ ...newPost, attachment: null })}
+                    />
+                  </div>
+                )}
 
-        {posts.length === 0 && (
-          <Card className="border-none shadow-lg bg-card/50 backdrop-blur">
-            <CardContent className="pt-6 text-center py-12">
-              <p className="text-lg text-muted-foreground">
-                No posts yet. Be the first to share your story! ✨
-              </p>
-            </CardContent>
-          </Card>
-        )}
+                <div className="flex items-center justify-between pt-2 border-t border-border/30">
+                  <label className="cursor-pointer text-muted-foreground hover:text-primary transition-colors">
+                    <Upload size={18} />
+                    <input
+                      type="file"
+                      hidden
+                      onChange={(e) => setNewPost({ ...newPost, attachment: e.target.files?.[0] || null })}
+                    />
+                  </label>
+
+                  <Button 
+                    onClick={handleCreatePost} 
+                    disabled={!newPost.content.trim()}
+                    className="rounded-full px-6 font-medium"
+                  >
+                    Post
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* FEED HEADER */}
+        <div className="flex items-center justify-between pt-4">
+          <h2 className="text-xl font-semibold">Community Feed</h2>
+          <Input 
+            placeholder="Search..." 
+            value={searchQuery} 
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-48 h-9 rounded-full border-border/50 text-sm"
+          />
+        </div>
+
+        {/* POSTS FEED (TWITTER-STYLE) */}
+        <div className="space-y-4">
+          {posts.map((post: any) => (
+            <Card key={post.id} className="border-border/50 hover:border-border transition-all bg-card/90 backdrop-blur">
+              <CardContent className="pt-6">
+                <div className="flex gap-3">
+                  <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary/20 to-primary/40 flex items-center justify-center text-base font-semibold flex-shrink-0">
+                    {(post.user_name || "?").charAt(0).toUpperCase()}
+                  </div>
+                  
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-baseline gap-2 mb-1">
+                      <span className="font-semibold">{post.user_name || "Anonymous"}</span>
+                      <span className="text-xs text-muted-foreground">• {post.category}</span>
+                    </div>
+
+                    <p className="text-foreground/90 leading-relaxed mb-3 whitespace-pre-wrap">
+                      {post.content}
+                    </p>
+
+                    {post.attachment_url && (
+                      <a
+                        href={supabase.storage.from("forum-attachments").getPublicUrl(post.attachment_url).data.publicUrl}
+                        target="_blank"
+                        className="inline-flex items-center gap-1 text-primary hover:underline text-sm mb-3"
+                      >
+                        📎 Attachment
+                      </a>
+                    )}
+
+                    {/* ACTIONS */}
+                    <div className="flex gap-4 py-2">
+                      <button 
+                        onClick={() => handleLike(post.id)}
+                        className="flex items-center gap-1.5 text-muted-foreground hover:text-red-500 transition-colors group"
+                      >
+                        <Heart 
+                          className={post.post_likes?.some((l: any) => l.user_id === user?.id) ? "fill-red-500 text-red-500" : "group-hover:fill-red-500/20"} 
+                          size={18}
+                        />
+                        <span className="text-sm">{post.post_likes?.length || 0}</span>
+                      </button>
+
+                      <button className="flex items-center gap-1.5 text-muted-foreground hover:text-primary transition-colors">
+                        <MessageCircle size={18} />
+                        <span className="text-sm">{post.comments?.length || 0}</span>
+                      </button>
+                    </div>
+
+                    {/* COMMENTS SECTION */}
+                    {post.comments && post.comments.length > 0 && (
+                      <div className="mt-4 space-y-3 pt-4 border-t border-border/30">
+                        {post.comments.map((comment: any) => (
+                          <div key={comment.id} className="flex gap-2">
+                            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-accent to-accent/60 flex items-center justify-center text-xs font-semibold flex-shrink-0">
+                              {(comment.user_name || "?").charAt(0).toUpperCase()}
+                            </div>
+                            <div className="flex-1 bg-accent/20 rounded-2xl px-4 py-2.5 border border-border/20">
+                              <p className="font-semibold text-sm mb-0.5">{comment.user_name || "Anonymous"}</p>
+                              <p className="text-sm text-foreground/80">{comment.content}</p>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* COMMENT INPUT */}
+                    <div className="flex gap-2 mt-3">
+                      <Input
+                        placeholder="Write a kind reply… ❤️"
+                        className="rounded-full border-border/50 text-sm h-9"
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" && e.currentTarget.value.trim()) {
+                            handleComment(post.id, e.currentTarget.value);
+                            e.currentTarget.value = "";
+                          }
+                        }}
+                      />
+                      <Button 
+                        size="sm"
+                        className="rounded-full px-4"
+                        onClick={(e) => {
+                          const input = e.currentTarget.previousElementSibling as HTMLInputElement;
+                          if (input.value.trim()) {
+                            handleComment(post.id, input.value);
+                            input.value = "";
+                          }
+                        }}
+                      >
+                        <Send size={14} />
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+
+          {posts.length === 0 && (
+            <Card className="border-border/50 bg-card/50 backdrop-blur">
+              <CardContent className="py-16 text-center">
+                <p className="text-muted-foreground mb-2">
+                  No posts yet. Be the first to share! ✨
+                </p>
+                <p className="text-sm text-muted-foreground/60">
+                  Your story could inspire someone today.
+                </p>
+              </CardContent>
+            </Card>
+          )}
+        </div>
       </div>
     </div>
   );
