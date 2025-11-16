@@ -53,75 +53,77 @@ const AISummarizer = () => {
 
   const handleSummarize = async () => {
   if (!file) {
-    toast({
-      title: "No file selected",
-      description: "Please upload a legal document first",
-      variant: "destructive",
-    });
+    toast({ title: "No file selected", description: "Please upload a legal document first", variant: "destructive" });
     return;
   }
 
   setLoading(true);
-  setError('');
-  setSummary('');
+  setError("");
+  setSummary("");
 
   try {
-    // Extract text from the uploaded file
-    const documentText = await extractTextFromFile(file);
+    const formData = new FormData();
+    formData.append("file", file);
 
-    // 🔗 Send the text to your backend summarizer API
-   const formData = new FormData();
-formData.append("file", file);
+    const resp = await fetch("http://localhost:5000/upload", {
 
-const response = await fetch("http://localhost:5000/upload", {
-  method: "POST",
-  body: formData,
-});
-
-    const data = await response.json();
-
-    if (data.isLegal === false) {
-      setError(data.error);
-      toast({
-        title: "Not a Legal Document",
-        description: data.error,
-        variant: "destructive",
-      });
-      return;
-    }
-
-    if (data.status === "error") {
-      setError(data.message);
-      toast({
-        title: "Error",
-        description: data.message,
-        variant: "destructive",
-      });
-      return;
-    }
-
-    if (data.status === "success") {
-      const formattedSummary = data.summary.map((point, i) => `${i + 1}. ${point}`).join("\n\n");
-      setSummary(formattedSummary);
-      toast({
-        title: "Success!",
-        description: "Legal document summarized successfully",
-        className: "bg-accent text-accent-foreground",
-      });
-    }
-  } catch (err) {
-    console.error("Summarization error:", err);
-    const errorMsg = err.message || "Failed to summarize document";
-    setError(errorMsg);
-    toast({
-      title: "Error",
-      description: errorMsg,
-      variant: "destructive",
+      method: "POST",
+      body: formData,
     });
+
+    const ct = resp.headers.get("content-type") || "";
+
+    // If response is not ok, read text to display details
+    if (!resp.ok) {
+      const text = await resp.text();
+      console.error("Upload failed", { status: resp.status, statusText: resp.statusText, contentType: ct, bodyPreview: text.slice(0, 2000) });
+      setError(`Server error ${resp.status}: ${resp.statusText}`);
+      toast({
+        title: "Server error",
+        description: `Status ${resp.status}. Response preview: ${text.slice(0, 300)}`,
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // If content-type is JSON, parse JSON; otherwise show raw text
+    if (ct.includes("application/json")) {
+      const data = await resp.json();
+      console.log("JSON response:", data);
+
+      if (data.status === "error") {
+        setError(data.message || "Unknown server error");
+        toast({ title: "Error", description: data.message || "Unknown server error", variant: "destructive" });
+        return;
+      }
+
+      if (data.status === "success") {
+        const formattedSummary = data.summary.map((p: string, i: number) => `${i + 1}. ${p}`).join("\n\n");
+        setSummary(formattedSummary);
+        toast({ title: "Success", description: "Document summarized successfully" });
+        return;
+      }
+
+      // fallback if response structure unexpected
+      console.warn("Unexpected JSON shape:", data);
+      setSummary(JSON.stringify(data, null, 2));
+      return;
+    } else {
+      const text = await resp.text();
+      console.error("Response is not JSON:", text.slice(0, 2000));
+      setError("Server returned non-JSON response. Check console for details.");
+      toast({ title: "Invalid response", description: "Server returned non-JSON. See console.", variant: "destructive" });
+      return;
+    }
+  } catch (err: any) {
+    console.error("Fetch error:", err);
+    setError(err.message || "Failed to summarize document");
+    toast({ title: "Error", description: err.message || "Failed to summarize document", variant: "destructive" });
   } finally {
     setLoading(false);
   }
 };
+
 
 
   const handleCopy = () => {

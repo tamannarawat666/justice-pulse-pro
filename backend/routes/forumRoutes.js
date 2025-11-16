@@ -1,10 +1,9 @@
 import express from "express";
-import ForumPost from "../models/ForumPost.js";  // model
+import ForumPost from "../models/ForumPost.js";  
 import { verifyToken } from "../middleware/authMiddleware.js";
 
 const router = express.Router();
 
-// ✅ Create a post
 router.post("/post", verifyToken, async (req, res) => {
   try {
     const { title, content, category, location } = req.body;
@@ -14,7 +13,7 @@ router.post("/post", verifyToken, async (req, res) => {
       content,
       category,
       location,
-      user: req.user.id, // logged-in user
+      user: req.user.id, 
     });
 
     await newPost.save();
