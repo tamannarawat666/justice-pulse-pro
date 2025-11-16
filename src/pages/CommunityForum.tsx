@@ -1,304 +1,357 @@
-import { useState, useEffect } from "react";
-import { useAuth } from "@/contexts/AuthContext";
-import { supabase } from "@/integrations/supabase/client";
-import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
+// src/pages/CommunityForum.tsx
+"use client";
+
+import React, { useEffect, useState } from "react";
+import axios from "axios";
 import { Card, CardContent } from "@/components/ui/card";
-import { Heart, MessageCircle, Send } from "lucide-react";
-import { formatDistanceToNow } from "date-fns";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Button } from "@/components/ui/button";
+import { Heart, MessageCircle, Trash2, Edit3, Flag, X } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
+
+type Post = any;
+
+function timeAgo(isoOrDate: string | undefined | any) {
+  if (!isoOrDate) return "";
+  const d = new Date(isoOrDate);
+  const sec = Math.floor((Date.now() - d.getTime()) / 1000);
+  if (sec < 60) return `${sec}s ago`;
+  if (sec < 3600) return `${Math.floor(sec / 60)}m ago`;
+  if (sec < 86400) return `${Math.floor(sec / 3600)}h ago`;
+  if (sec < 2592000) return `${Math.floor(sec / 86400)}d ago`;
+  return d.toLocaleDateString();
+}
 
 export default function CommunityForum() {
-  const { user } = useAuth();
-  const [posts, setPosts] = useState([]);
-  const [newPostContent, setNewPostContent] = useState("");
-  const [expandedComments, setExpandedComments] = useState<Set<string>>(new Set());
-  const [commentInputs, setCommentInputs] = useState<Record<string, string>>({});
+  const [posts, setPosts] = useState<Post[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  // Create form fields (Version B)
+  const [userName, setUserName] = useState("");
+  const [title, setTitle] = useState("");
+  const [description, setDescription] = useState("");
+  const [category, setCategory] = useState("Help");
+  const [location, setLocation] = useState(""); // optional
+
+  // UI state
+  const [commentModalOpenFor, setCommentModalOpenFor] = useState<string | null>(null);
+  const [commentDrafts, setCommentDrafts] = useState<Record<string, string>>({});
+  const [threadReplies, setThreadReplies] = useState<Record<string, any[]>>({});
+  const [editingPostId, setEditingPostId] = useState<string | null>(null);
+  const [editingTitle, setEditingTitle] = useState("");
+  const [editingDescription, setEditingDescription] = useState("");
+  const [editingCategory, setEditingCategory] = useState("Help");
+  const [editingLocation, setEditingLocation] = useState("");
+
+  const categories = ["Help", "Advice", "Suggestion", "Discussion", "Announcement"];
+  const locations = ["Delhi", "Mumbai", "Bengaluru", "Hyderabad", "Chennai", "Kolkata", "Pune", "Other"];
 
   useEffect(() => {
-    fetchPosts();
-
-    // Real-time subscription for new posts and updates
-    const channel = supabase
-      .channel('posts-changes')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'posts',
-        },
-        () => {
-          fetchPosts();
-        }
-      )
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'comments',
-        },
-        () => {
-          fetchPosts();
-        }
-      )
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'post_likes',
-        },
-        () => {
-          fetchPosts();
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
+    loadPosts();
   }, []);
 
-  const fetchPosts = async () => {
-    const { data, error } = await supabase
-      .from("posts")
-      .select(`
-        *,
-        post_likes(user_id),
-        comments(
-          *
-        )
-      `)
-      .order("created_at", { ascending: false });
+  async function loadPosts() {
+    setLoading(true);
+    try {
+      const res = await axios.get("http://localhost:5000/posts");
+      setPosts(res.data || []);
+    } catch (err) {
+      console.error("Failed to fetch posts:", err);
+    } finally {
+      setLoading(false);
+    }
+  }
 
-    if (!error) setPosts(data || []);
-  };
-
-  const handleCreatePost = async () => {
-    if (!newPostContent.trim()) return;
-
-    await supabase.from("posts").insert([
-      {
-        user_id: user?.id,
-        user_name: user?.name || "Anonymous",
-        title: "Post",
-        content: newPostContent,
-        category: "General",
-      },
-    ]);
-
-    setNewPostContent("");
-  };
-
-  const handleLike = async (postId: string) => {
-    const { data: alreadyLiked } = await supabase
-      .from("post_likes")
-      .select("*")
-      .eq("post_id", postId)
-      .eq("user_id", user?.id)
-      .single();
-
-    if (alreadyLiked) {
-      await supabase.from("post_likes").delete().eq("id", alreadyLiked.id);
-    } else {
-      await supabase.from("post_likes").insert([{ post_id: postId, user_id: user?.id }]);
+  async function handleCreatePost() {
+    if (!userName.trim() || !title.trim() || !description.trim() || !category.trim()) {
+      alert("Please fill Name, Title, Description and Category.");
+      return;
     }
 
-    fetchPosts();
-  };
+    try {
+      await axios.post("http://localhost:5000/posts", {
+        userName,
+        title,
+        description,
+        category,
+        location, // optional (can be "")
+      });
 
-  const handleComment = async (postId: string) => {
-    const commentText = commentInputs[postId];
-    if (!commentText?.trim()) return;
+      setUserName("");
+      setTitle("");
+      setDescription("");
+      setCategory("Help");
+      setLocation("");
 
-    await supabase.from("comments").insert([
-      {
-        user_id: user?.id,
-        user_name: user?.name || "Anonymous",
-        post_id: postId,
-        content: commentText,
-      },
-    ]);
-
-    setCommentInputs({ ...commentInputs, [postId]: "" });
-  };
-
-  const toggleComments = (postId: string) => {
-    const newExpanded = new Set(expandedComments);
-    if (newExpanded.has(postId)) {
-      newExpanded.delete(postId);
-    } else {
-      newExpanded.add(postId);
+      await loadPosts();
+    } catch (err) {
+      console.error("Create post failed", err);
+      alert("Create failed. See server console.");
     }
-    setExpandedComments(newExpanded);
-  };
+  }
+
+  async function handleDelete(postId: string) {
+    if (!confirm("Delete this post?")) return;
+    try {
+      await axios.delete(`http://localhost:5000/posts/${postId}`);
+      await loadPosts();
+    } catch (err) {
+      console.error("Delete failed", err);
+      alert("Delete failed. See console.");
+    }
+  }
+
+  function openEdit(post: Post) {
+    setEditingPostId(post._id);
+    setEditingTitle(post.title);
+    setEditingDescription(post.description);
+    setEditingCategory(post.category || "Help");
+    setEditingLocation(post.location || "");
+  }
+
+  async function saveEdit() {
+    if (!editingPostId) return;
+    if (!editingTitle.trim() || !editingDescription.trim() || !editingCategory.trim()) {
+      alert("Please fill required fields.");
+      return;
+    }
+    try {
+      await axios.put(`http://localhost:5000/posts/${editingPostId}`, {
+        title: editingTitle,
+        description: editingDescription,
+        category: editingCategory,
+        location: editingLocation || "",
+      });
+      setEditingPostId(null);
+      await loadPosts();
+    } catch (err) {
+      console.error("Edit failed", err);
+      alert("Edit failed. See console.");
+    }
+  }
+
+  async function toggleLike(postId: string, who: string) {
+    if (!who || !who.trim()) {
+      alert("Please enter your name at the top to like.");
+      return;
+    }
+    try {
+      await axios.post(`http://localhost:5000/posts/${postId}/like`, { userName: who });
+      await loadPosts();
+    } catch (err) {
+      console.error("Like failed", err);
+      alert("Like failed. See console.");
+    }
+  }
+
+  async function addComment(postId: string) {
+    const text = (commentDrafts[postId] || "").trim();
+    if (!text) return alert("Write a comment first.");
+    const author = userName?.trim() ? userName.trim() : "Guest";
+    try {
+      await axios.post(`http://localhost:5000/posts/${postId}/comment`, { userName: author, text });
+      setCommentDrafts((s) => ({ ...(s || {}), [postId]: "" }));
+      await loadPosts();
+    } catch (err) {
+      console.error("Comment failed", err);
+      alert("Comment failed. See console.");
+    }
+  }
+
+  function addThreadReply(postId: string, parentIndex: number, text: string) {
+    if (!text.trim()) return;
+    setThreadReplies((prev) => {
+      const copy = { ...(prev || {}) };
+      copy[postId] = copy[postId] || [];
+      copy[postId].push({ parentIndex, userName: userName?.trim() || "Guest", text: text.trim(), createdAt: new Date().toISOString() });
+      return copy;
+    });
+  }
+
+  function getThreadReplies(postId: string) {
+    return threadReplies[postId] || [];
+  }
 
   return (
-    <div className="min-h-screen bg-background">
-      <div className="max-w-2xl mx-auto px-4 py-8 space-y-6">
-        
-        {/* HEADER */}
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold mb-2">
-            Hey, {user?.name || "Friend"} 👋
-          </h1>
-          <p className="text-muted-foreground">
-            Share your thoughts, experiences, or advice with the community
-          </p>
+    <div className="min-h-screen bg-slate-50 text-slate-900">
+      <div className="max-w-4xl mx-auto px-4 py-8">
+        <div className="flex items-center justify-between mb-6">
+          <div>
+            <h1 className="text-3xl font-bold">Justice Hub — Community</h1>
+            <p className="text-slate-600 mt-1">Share your thoughts, ask for help, and support each other.</p>
+          </div>
         </div>
 
-        {/* CREATE POST */}
-        <Card className="border-border shadow-sm">
-          <CardContent className="pt-6">
+        {/* Create form */}
+        <Card className="mb-6 p-4 shadow-sm bg-white">
+          <CardContent>
             <div className="flex gap-3">
-              <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center text-lg font-semibold flex-shrink-0">
-                {(user?.name || "?").charAt(0).toUpperCase()}
-              </div>
-              
-              <div className="flex-1 space-y-3">
-                <Textarea
-                  placeholder="Share what's on your mind…"
-                  value={newPostContent}
-                  onChange={(e) => setNewPostContent(e.target.value)}
-                  className="min-h-[80px] resize-none border-0 focus-visible:ring-0 p-0 text-base"
-                />
+              <Input placeholder="Your name (required)" value={userName} onChange={(e) => setUserName(e.target.value)} className="w-1/4" />
+              <Input placeholder="Post title (required)" value={title} onChange={(e) => setTitle(e.target.value)} className="flex-1" />
+            </div>
 
-                <div className="flex justify-end">
-                  <Button 
-                    onClick={handleCreatePost} 
-                    disabled={!newPostContent.trim()}
-                    className="rounded-full px-8"
-                  >
-                    Post
-                  </Button>
-                </div>
+            <div className="mt-3 flex gap-3">
+              <Textarea placeholder="Description (required)" value={description} onChange={(e) => setDescription(e.target.value)} className="flex-1" rows={3} />
+              <div className="w-64 flex flex-col gap-2">
+                <select className="p-2 rounded-md border" value={category} onChange={(e) => setCategory(e.target.value)}>
+                  {categories.map((c) => (<option key={c}>{c}</option>))}
+                </select>
+
+                <select className="p-2 rounded-md border" value={location} onChange={(e) => setLocation(e.target.value)}>
+                  <option value="">Select location (optional)</option>
+                  {locations.map((l) => (<option key={l} value={l}>{l}</option>))}
+                </select>
+
+                <Button onClick={handleCreatePost} className="mt-2">Post</Button>
               </div>
             </div>
           </CardContent>
         </Card>
 
-        {/* POSTS FEED */}
-        <div className="space-y-4">
-          {posts.map((post: any) => (
-            <Card key={post.id} className="border-border shadow-sm hover:shadow-md transition-shadow">
-              <CardContent className="pt-6">
-                <div className="flex gap-3">
-                  <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center text-lg font-semibold flex-shrink-0">
-                    {(post.user_name || "?").charAt(0).toUpperCase()}
-                  </div>
-                  
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-2">
-                      <span className="font-semibold text-base">{post.user_name || "Anonymous"}</span>
-                      <span className="text-xs text-muted-foreground">
-                        • {formatDistanceToNow(new Date(post.created_at), { addSuffix: true })}
-                      </span>
-                    </div>
+        <div className="space-y-5">
+          {loading && <div className="text-center text-slate-500">Loading posts…</div>}
+          {!loading && posts.length === 0 && <div className="text-center text-slate-500">No posts yet — be the first to share!</div>}
 
-                    <p className="text-foreground leading-relaxed mb-4 whitespace-pre-wrap">
-                      {post.content}
-                    </p>
-
-                    {/* ACTIONS */}
-                    <div className="flex gap-6 pb-3 border-b border-border">
-                      <button 
-                        onClick={() => handleLike(post.id)}
-                        className="flex items-center gap-2 text-muted-foreground hover:text-red-500 transition-colors group"
-                      >
-                        <Heart 
-                          className={post.post_likes?.some((l: any) => l.user_id === user?.id) ? "fill-red-500 text-red-500" : "group-hover:fill-red-500/20"} 
-                          size={20}
-                        />
-                        <span className="text-sm font-medium">{post.post_likes?.length || 0} Likes</span>
-                      </button>
-
-                      <button 
-                        onClick={() => toggleComments(post.id)}
-                        className="flex items-center gap-2 text-muted-foreground hover:text-primary transition-colors"
-                      >
-                        <MessageCircle size={20} />
-                        <span className="text-sm font-medium">
-                          {post.comments?.length || 0} Comments
-                        </span>
-                      </button>
-                    </div>
-
-                    {/* COMMENTS SECTION - EXPANDABLE */}
-                    {expandedComments.has(post.id) && (
-                      <div className="mt-4 space-y-4">
-                        {/* EXISTING COMMENTS */}
-                        {post.comments && post.comments.length > 0 && (
-                          <div className="space-y-3">
-                            {post.comments.map((comment: any) => (
-                              <div key={comment.id} className="flex gap-3">
-                                <div className="w-10 h-10 rounded-full bg-accent/50 flex items-center justify-center text-sm font-semibold flex-shrink-0">
-                                  {(comment.user_name || "?").charAt(0).toUpperCase()}
-                                </div>
-                                <div className="flex-1 bg-accent/20 rounded-xl px-4 py-3">
-                                  <div className="flex items-center gap-2 mb-1">
-                                    <p className="font-semibold text-sm">{comment.user_name || "Anonymous"}</p>
-                                    <span className="text-xs text-muted-foreground">
-                                      {formatDistanceToNow(new Date(comment.created_at), { addSuffix: true })}
-                                    </span>
-                                  </div>
-                                  <p className="text-sm">{comment.content}</p>
-                                </div>
-                              </div>
-                            ))}
+          {posts.map((post) => {
+            const replies = getThreadReplies(post._id);
+            return (
+              <motion.div key={post._id} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}>
+                <Card className="shadow-sm">
+                  <CardContent>
+                    <div className="flex justify-between items-start">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center font-semibold text-blue-700">{String(post.userName || "U").charAt(0).toUpperCase()}</div>
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <h3 className="text-lg font-semibold">{post.title}</h3>
+                            <span className="text-xs px-2 py-0.5 rounded-md bg-sky-100 text-sky-800">{post.category}</span>
                           </div>
-                        )}
-
-                        {/* COMMENT INPUT */}
-                        <div className="flex gap-3 items-start">
-                          <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-sm font-semibold flex-shrink-0">
-                            {(user?.name || "?").charAt(0).toUpperCase()}
-                          </div>
-                          <div className="flex-1 flex gap-2">
-                            <Textarea
-                              placeholder="Write a kind reply… ❤️"
-                              value={commentInputs[post.id] || ""}
-                              onChange={(e) => setCommentInputs({ ...commentInputs, [post.id]: e.target.value })}
-                              className="min-h-[60px] resize-none text-sm"
-                              onKeyDown={(e) => {
-                                if (e.key === "Enter" && !e.shiftKey) {
-                                  e.preventDefault();
-                                  handleComment(post.id);
-                                }
-                              }}
-                            />
-                            <Button 
-                              size="sm"
-                              onClick={() => handleComment(post.id)}
-                              disabled={!commentInputs[post.id]?.trim()}
-                              className="self-end"
-                            >
-                              <Send size={16} />
-                            </Button>
-                          </div>
+                          <div className="text-sm text-slate-500">{post.userName} • {post.location || "Unknown"} • {timeAgo(post.createdAt)}</div>
                         </div>
                       </div>
-                    )}
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
 
-          {posts.length === 0 && (
-            <Card className="border-border shadow-sm">
-              <CardContent className="py-16 text-center">
-                <p className="text-muted-foreground mb-2">
-                  No posts yet. Be the first to share! ✨
-                </p>
-                <p className="text-sm text-muted-foreground/70">
-                  Your voice matters here
-                </p>
-              </CardContent>
-            </Card>
-          )}
+                      <div className="flex items-center gap-2 text-slate-500">
+                        <button onClick={() => toggleLike(post._id, userName || "Guest")} className="flex items-center gap-2 px-2 py-1 rounded hover:bg-slate-100">
+                          <Heart size={16} className="text-red-500" />
+                          <span className="text-sm">{Array.isArray(post.likedBy) ? post.likedBy.length : 0}</span>
+                        </button>
+
+                        <button onClick={() => setCommentModalOpenFor(post._id)} className="flex items-center gap-2 px-2 py-1 rounded hover:bg-slate-100">
+                          <MessageCircle size={16} />
+                          <span className="text-sm">{(post.comments || []).length}</span>
+                        </button>
+
+                        <button onClick={() => openEdit(post)} className="p-1 rounded hover:bg-slate-100"><Edit3 size={16} /></button>
+                        <button onClick={() => handleDelete(post._id)} className="p-1 rounded hover:bg-slate-100"><Trash2 size={16} /></button>
+                        <button onClick={() => { alert("Report received (demo)"); }} className="p-1 rounded hover:bg-slate-100"><Flag size={16} /></button>
+                      </div>
+                    </div>
+
+                    <div className="mt-4">
+                      {editingPostId === post._id ? (
+                        <div className="space-y-2">
+                          <Input value={editingTitle} onChange={(e) => setEditingTitle(e.target.value)} />
+                          <Textarea value={editingDescription} onChange={(e) => setEditingDescription(e.target.value)} rows={4} />
+                          <div className="flex gap-2">
+                            <select className="p-2 rounded-md border" value={editingCategory} onChange={(e) => setEditingCategory(e.target.value)}>
+                              {categories.map((c) => (<option key={c}>{c}</option>))}
+                            </select>
+                            <select className="p-2 rounded-md border" value={editingLocation} onChange={(e) => setEditingLocation(e.target.value)}>
+                              <option value="">Location (optional)</option>
+                              {locations.map((l) => (<option key={l} value={l}>{l}</option>))}
+                            </select>
+                          </div>
+                          <div className="flex gap-2 mt-2">
+                            <Button onClick={saveEdit}>Save</Button>
+                            <Button variant="ghost" onClick={() => setEditingPostId(null)}>Cancel</Button>
+                          </div>
+                        </div>
+                      ) : (
+                        <p className="text-slate-800 whitespace-pre-wrap">{post.description}</p>
+                      )}
+                    </div>
+
+                    <div className="mt-4 text-sm text-slate-500">
+                      <span>{post.comments?.length || 0} comments</span>
+                      <span className="mx-2">•</span>
+                      <span>Likes: {Array.isArray(post.likedBy) ? post.likedBy.length : 0}</span>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* comment modal */}
+                <AnimatePresence>
+                  {commentModalOpenFor === post._id && (
+                    <motion.div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+                      <motion.div className="w-full max-w-2xl bg-white rounded-2xl shadow-xl overflow-hidden" initial={{ y: 20, scale: 0.98 }} animate={{ y: 0, scale: 1 }} exit={{ y: 20, scale: 0.98 }}>
+                        <div className="flex items-center justify-between p-4 border-b">
+                          <div>
+                            <h3 className="font-semibold">Comments — {post.title}</h3>
+                            <div className="text-sm text-slate-500">{post.userName} • {timeAgo(post.createdAt)}</div>
+                          </div>
+                          <button onClick={() => setCommentModalOpenFor(null)} className="p-2"><X /></button>
+                        </div>
+
+                        <div className="p-4 max-h-[60vh] overflow-auto space-y-3">
+                          {(post.comments || []).map((c: any, idx: number) => (
+                            <div key={idx} className="p-3 rounded-lg border">
+                              <div className="flex justify-between items-start">
+                                <div>
+                                  <div className="flex items-center gap-2">
+                                    <div className="w-8 h-8 rounded-full bg-blue-50 text-blue-700 flex items-center justify-center text-sm font-medium">{String(c.userName || "G").charAt(0).toUpperCase()}</div>
+                                    <div>
+                                      <div className="text-sm font-medium">{c.userName}</div>
+                                      <div className="text-xs text-slate-500">{timeAgo(c.createdAt)}</div>
+                                    </div>
+                                  </div>
+                                  <div className="mt-2 text-sm text-slate-800">{c.text}</div>
+                                </div>
+                                <div className="text-xs text-slate-400">#{idx + 1}</div>
+                              </div>
+
+                              <div className="mt-3 ml-10 space-y-2">
+                                {getThreadReplies(post._id).filter(r => r.parentIndex === idx).map((r, rIdx) => (
+                                  <div key={rIdx} className="p-2 bg-slate-50 rounded-md">
+                                    <div className="text-sm font-medium">{r.userName} • <span className="text-xs text-slate-400">{timeAgo(r.createdAt)}</span></div>
+                                    <div className="text-sm">{r.text}</div>
+                                  </div>
+                                ))}
+
+                                <ReplyInput postId={post._id} parentIndex={idx} onReply={(text) => addThreadReply(post._id, idx, text)} placeholder={`Reply to ${c.userName}...`} />
+                              </div>
+                            </div>
+                          ))}
+
+                          <div className="mt-2 p-2 rounded-md border">
+                            <Input placeholder="Write a comment…" value={commentDrafts[post._id] || ""} onChange={(e) => setCommentDrafts((s) => ({ ...(s || {}), [post._id]: e.target.value }))} />
+                            <div className="flex gap-2 mt-2">
+                              <Button onClick={() => addComment(post._id)}>Post comment</Button>
+                              <Button variant="ghost" onClick={() => setCommentModalOpenFor(null)}>Close</Button>
+                            </div>
+                          </div>
+                        </div>
+                      </motion.div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </motion.div>
+            );
+          })}
         </div>
       </div>
     </div>
   );
 }
+
+/* ReplyInput component (local state per input) */
+function ReplyInput({ postId, parentIndex, onReply, placeholder }: { postId: string; parentIndex: number; onReply: (text: string) => void; placeholder?: string }) {
+  const [text, setText] = useState("");
+  return (
+    <div className="flex gap-2">
+      <Input placeholder={placeholder || "Write a reply..."} value={text} onChange={(e) => setText(e.target.value)} />
+      <Button onClick={() => { if (text.trim()) { onReply(text); setText(""); } }}>Reply</Button>
+    </div>
+  );
+}
+
