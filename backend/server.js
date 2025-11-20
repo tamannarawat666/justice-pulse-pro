@@ -4,6 +4,7 @@ import cors from "cors";
 import dotenv from "dotenv";
 import bodyParser from "body-parser";
 import hearingsRoutes from "./routes/hearings.js";
+import summarizerRoutes from "./routes/summarizerRoute.js";
 
 dotenv.config();
 
@@ -14,6 +15,7 @@ app.use(bodyParser.json());
 
 // Routes
 app.use("/hearings", hearingsRoutes);
+app.use(summarizerRoutes);
 
 mongoose
   .connect(process.env.MONGO_URI)

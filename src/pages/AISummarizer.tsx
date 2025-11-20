@@ -1,33 +1,48 @@
-import { useState } from 'react';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Upload, FileText, AlertCircle, CheckCircle, Copy, Download, Loader2, Sparkles } from 'lucide-react';
-import { supabase } from '@/integrations/supabase/client';
-import { useToast } from '@/hooks/use-toast';
+import { useState } from "react";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+} from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import {
+  Upload,
+  FileText,
+  AlertCircle,
+  CheckCircle,
+  Copy,
+  Download,
+  Loader2,
+  Sparkles,
+} from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
 
 const AISummarizer = () => {
   const [file, setFile] = useState<File | null>(null);
-  const [summary, setSummary] = useState('');
+  const [summary, setSummary] = useState("");
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
+  const [error, setError] = useState("");
   const { toast } = useToast();
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0];
     if (selectedFile) {
-      const fileExtension = selectedFile.name.split('.').pop()?.toLowerCase();
-      const allowedTypes = ['pdf', 'doc', 'docx'];
-      
-      if (!allowedTypes.includes(fileExtension || '')) {
-        setError('Please upload only PDF, DOC, or DOCX files');
+      const fileExtension = selectedFile.name.split(".").pop()?.toLowerCase();
+      const allowedTypes = ["pdf", "doc", "docx"];
+
+      if (!allowedTypes.includes(fileExtension || "")) {
+        setError("Please upload only PDF, DOC, or DOCX files");
         setFile(null);
         return;
       }
-      
-      setError('');
+
+      setError("");
       setFile(selectedFile);
-      setSummary('');
+      setSummary("");
     }
   };
 
@@ -37,92 +52,97 @@ const AISummarizer = () => {
       reader.onload = async (e) => {
         const arrayBuffer = e.target?.result as ArrayBuffer;
         const bytes = new Uint8Array(arrayBuffer);
-        let binary = '';
+        let binary = "";
         for (let i = 0; i < bytes.byteLength; i++) {
           binary += String.fromCharCode(bytes[i]);
         }
         const base64 = btoa(binary);
-        resolve(`File: ${file.name}\nType: ${file.type}\nSize: ${file.size} bytes\nContent (Base64 sample): ${base64.substring(0, 500)}...`);
+        resolve(
+          `File: ${file.name}\nType: ${file.type}\nSize: ${
+            file.size
+          } bytes\nContent (Base64 sample): ${base64.substring(0, 500)}...`
+        );
       };
       reader.onerror = () => {
-        resolve(`Document: ${file.name}\nType: ${file.type}\nSize: ${file.size} bytes`);
+        resolve(
+          `Document: ${file.name}\nType: ${file.type}\nSize: ${file.size} bytes`
+        );
       };
       reader.readAsArrayBuffer(file);
     });
   };
 
   const handleSummarize = async () => {
-  if (!file) {
-    toast({
-      title: "No file selected",
-      description: "Please upload a legal document first",
-      variant: "destructive",
-    });
-    return;
-  }
-
-  setLoading(true);
-  setError('');
-  setSummary('');
-
-  try {
-    // Extract text from the uploaded file
-    const documentText = await extractTextFromFile(file);
-
-    // 🔗 Send the text to your backend summarizer API
-   const formData = new FormData();
-formData.append("file", file);
-
-const response = await fetch("http://localhost:5000/upload", {
-  method: "POST",
-  body: formData,
-});
-
-    const data = await response.json();
-
-    if (data.isLegal === false) {
-      setError(data.error);
+    if (!file) {
       toast({
-        title: "Not a Legal Document",
-        description: data.error,
+        title: "No file selected",
+        description: "Please upload a legal document first",
         variant: "destructive",
       });
       return;
     }
 
-    if (data.status === "error") {
-      setError(data.message);
+    setLoading(true);
+    setError("");
+    setSummary("");
+
+    try {
+      // Extract text from the uploaded file
+      const documentText = await extractTextFromFile(file);
+
+      // 🔗 Send the text to your backend summarizer API
+      const formData = new FormData();
+      formData.append("file", file);
+
+      const response = await fetch("http://localhost:5000/upload", {
+        method: "POST",
+        body: formData,
+      });
+
+      const data = await response.json();
+
+      if (data.isLegal === false) {
+        setError(data.error);
+        toast({
+          title: "Not a Legal Document",
+          description: data.error,
+          variant: "destructive",
+        });
+        return;
+      }
+
+      if (data.status === "error") {
+        setError(data.message);
+        toast({
+          title: "Error",
+          description: data.message,
+          variant: "destructive",
+        });
+        return;
+      }
+
+      if (data.status === "success") {
+        const formattedSummary = data.summary;
+         setSummary(formattedSummary);
+        toast({
+          title: "Success!",
+          description: "Legal document summarized successfully",
+          className: "bg-accent text-accent-foreground",
+        });
+      }
+    } catch (err) {
+      console.error("Summarization error:", err);
+      const errorMsg = err.message || "Failed to summarize document";
+      setError(errorMsg);
       toast({
         title: "Error",
-        description: data.message,
+        description: errorMsg,
         variant: "destructive",
       });
-      return;
+    } finally {
+      setLoading(false);
     }
-
-    if (data.status === "success") {
-      const formattedSummary = data.summary.map((point, i) => `${i + 1}. ${point}`).join("\n\n");
-      setSummary(formattedSummary);
-      toast({
-        title: "Success!",
-        description: "Legal document summarized successfully",
-        className: "bg-accent text-accent-foreground",
-      });
-    }
-  } catch (err) {
-    console.error("Summarization error:", err);
-    const errorMsg = err.message || "Failed to summarize document";
-    setError(errorMsg);
-    toast({
-      title: "Error",
-      description: errorMsg,
-      variant: "destructive",
-    });
-  } finally {
-    setLoading(false);
-  }
-};
-
+  };
 
   const handleCopy = () => {
     navigator.clipboard.writeText(summary);
@@ -133,11 +153,11 @@ const response = await fetch("http://localhost:5000/upload", {
   };
 
   const handleDownload = () => {
-    const blob = new Blob([summary], { type: 'text/plain' });
+    const blob = new Blob([summary], { type: "text/plain" });
     const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
+    const a = document.createElement("a");
     a.href = url;
-    a.download = `${file?.name || 'document'}-summary.txt`;
+    a.download = `${file?.name || "document"}-summary.txt`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -153,10 +173,13 @@ const response = await fetch("http://localhost:5000/upload", {
       <div className="mb-8 animate-fade-in">
         <div className="flex items-center gap-3 mb-3">
           <Sparkles className="h-8 w-8 text-accent" />
-          <h1 className="text-4xl md:text-5xl font-bold text-gradient">AI Document Summarizer</h1>
+          <h1 className="text-4xl md:text-5xl font-bold text-gradient">
+            AI Document Summarizer
+          </h1>
         </div>
         <p className="text-muted-foreground text-lg">
-          Upload your legal document and get an easy-to-understand summary in seconds
+          Upload your legal document and get an easy-to-understand summary in
+          seconds
         </p>
       </div>
 
@@ -197,13 +220,15 @@ const response = await fetch("http://localhost:5000/upload", {
                 <FileText className="h-5 w-5 text-accent flex-shrink-0" />
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-semibold truncate">{file.name}</p>
-                  <p className="text-xs text-muted-foreground">{(file.size / 1024).toFixed(2)} KB</p>
+                  <p className="text-xs text-muted-foreground">
+                    {(file.size / 1024).toFixed(2)} KB
+                  </p>
                 </div>
               </div>
             )}
 
-            <Button 
-              onClick={handleSummarize} 
+            <Button
+              onClick={handleSummarize}
               disabled={!file || loading}
               className="w-full h-12 text-lg gradient-accent border-0 hover:opacity-90 shadow-lg"
             >
@@ -222,7 +247,10 @@ const response = await fetch("http://localhost:5000/upload", {
           </CardContent>
         </Card>
 
-        <Card className="animate-slide-up border-2 hover:border-accent/50 transition-colors" style={{ animationDelay: '100ms' }}>
+        <Card
+          className="animate-slide-up border-2 hover:border-accent/50 transition-colors"
+          style={{ animationDelay: "100ms" }}
+        >
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-2xl">
               <CheckCircle className="h-6 w-6 text-accent" />
@@ -241,16 +269,16 @@ const response = await fetch("http://localhost:5000/upload", {
                   </div>
                 </div>
                 <div className="flex gap-3 pt-4 border-t">
-                  <Button 
-                    onClick={handleCopy} 
+                  <Button
+                    onClick={handleCopy}
                     variant="outline"
                     className="flex-1 border-2 hover:border-accent hover:text-accent"
                   >
                     <Copy className="h-4 w-4 mr-2" />
                     Copy
                   </Button>
-                  <Button 
-                    onClick={handleDownload} 
+                  <Button
+                    onClick={handleDownload}
                     variant="outline"
                     className="flex-1 border-2 hover:border-accent hover:text-accent"
                   >
@@ -263,7 +291,9 @@ const response = await fetch("http://localhost:5000/upload", {
               <div className="text-center py-16 text-muted-foreground">
                 <FileText className="h-16 w-16 mx-auto mb-4 opacity-30" />
                 <p className="text-lg font-medium mb-2">No summary yet</p>
-                <p className="text-sm">Upload a legal document to get started</p>
+                <p className="text-sm">
+                  Upload a legal document to get started
+                </p>
               </div>
             )}
           </CardContent>
@@ -279,15 +309,15 @@ const response = await fetch("http://localhost:5000/upload", {
           </h3>
           <div className="grid md:grid-cols-3 gap-4">
             {[
-              'Contracts & Agreements',
-              'Court Documents',
-              'Legal Notices',
-              'Petitions & Affidavits',
-              'Property Documents',
-              'Corporate Legal Papers'
+              "Contracts & Agreements",
+              "Court Documents",
+              "Legal Notices",
+              "Petitions & Affidavits",
+              "Property Documents",
+              "Corporate Legal Papers",
             ].map((type, index) => (
-              <div 
-                key={index} 
+              <div
+                key={index}
                 className="flex items-center gap-2 p-3 bg-primary/5 rounded-lg animate-fade-in"
                 style={{ animationDelay: `${index * 50}ms` }}
               >
