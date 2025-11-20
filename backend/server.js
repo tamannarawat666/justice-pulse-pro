@@ -4,6 +4,7 @@ import cors from "cors";
 import dotenv from "dotenv";
 import bodyParser from "body-parser";
 import hearingsRoutes from "./routes/hearings.js";
+import summarizerRoutes from "./routes/summarize.js";   // ✅ only one import
 
 import multer from "multer";
 import path from "path";
@@ -11,9 +12,6 @@ import fs from "fs";
 
 // Community Forum model
 import Post from "./models/Post.js";
-
-// NEW: summarizer route (clean version)
-import summarizerRoutes from "./routes/summarize.js";
 
 dotenv.config();
 
@@ -29,8 +27,8 @@ app.use("/uploads", express.static(path.join(process.cwd(), "uploads")));
 // Hearings route
 app.use("/hearings", hearingsRoutes);
 
-// Summarizer route (THE ONLY ONE NOW)
-app.use("/summarize", summarizerRoutes);
+// Summarizer route
+app.use("/summarize", summarizerRoutes);   // ✅ only one usage
 
 // Health check
 app.get("/", (req, res) => res.json({ status: "ok", message: "Server active" }));
