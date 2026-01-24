@@ -1,4 +1,3 @@
-// src/pages/CommunityForum.tsx
 "use client";
 
 import React, { useEffect, useState } from "react";
@@ -27,7 +26,7 @@ export default function CommunityForum() {
   const [posts, setPosts] = useState<Post[]>([]);
   const [loading, setLoading] = useState(false);
 
-  // Create form fields (Version B)
+  // Form fields
   const [userName, setUserName] = useState("");
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -69,13 +68,18 @@ export default function CommunityForum() {
       return;
     }
 
+    if (location && !locations.includes(location)) {
+      alert("Invalid location choice.");
+      return;
+    }
+
     try {
       await axios.post("http://localhost:5000/posts", {
-        userName,
-        title,
-        description,
-        category,
-        location, // optional (can be "")
+        userName: userName.trim(),
+        title: title.trim(),
+        description: description.trim(),
+        category: category.trim(),
+        location: location || "",
       });
 
       setUserName("");
@@ -116,11 +120,17 @@ export default function CommunityForum() {
       alert("Please fill required fields.");
       return;
     }
+
+    if (editingLocation && !locations.includes(editingLocation)) {
+      alert("Invalid location choice.");
+      return;
+    }
+
     try {
       await axios.put(`http://localhost:5000/posts/${editingPostId}`, {
-        title: editingTitle,
-        description: editingDescription,
-        category: editingCategory,
+        title: editingTitle.trim(),
+        description: editingDescription.trim(),
+        category: editingCategory.trim(),
         location: editingLocation || "",
       });
       setEditingPostId(null);
@@ -132,12 +142,12 @@ export default function CommunityForum() {
   }
 
   async function toggleLike(postId: string, who: string) {
-    if (!who || !who.trim()) {
+    if (!who?.trim()) {
       alert("Please enter your name at the top to like.");
       return;
     }
     try {
-      await axios.post(`http://localhost:5000/posts/${postId}/like`, { userName: who });
+      await axios.post(`http://localhost:5000/posts/${postId}/like`, { userName: who.trim() });
       await loadPosts();
     } catch (err) {
       console.error("Like failed", err);
@@ -148,7 +158,7 @@ export default function CommunityForum() {
   async function addComment(postId: string) {
     const text = (commentDrafts[postId] || "").trim();
     if (!text) return alert("Write a comment first.");
-    const author = userName?.trim() ? userName.trim() : "Guest";
+    const author = userName?.trim() || "Guest";
     try {
       await axios.post(`http://localhost:5000/posts/${postId}/comment`, { userName: author, text });
       setCommentDrafts((s) => ({ ...(s || {}), [postId]: "" }));
@@ -176,12 +186,8 @@ export default function CommunityForum() {
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900">
       <div className="max-w-4xl mx-auto px-4 py-8">
-        <div className="flex items-center justify-between mb-6">
-          <div>
-            <h1 className="text-3xl font-bold">Justice Hub — Community</h1>
-            <p className="text-slate-600 mt-1">Share your thoughts, ask for help, and support each other.</p>
-          </div>
-        </div>
+        <h1 className="text-3xl font-bold mb-2">Justice Hub — Community</h1>
+        <p className="text-slate-600 mb-6">Share your thoughts, ask for help, and support each other.</p>
 
         {/* Create form */}
         <Card className="mb-6 p-4 shadow-sm bg-white">
@@ -190,25 +196,23 @@ export default function CommunityForum() {
               <Input placeholder="Your name (required)" value={userName} onChange={(e) => setUserName(e.target.value)} className="w-1/4" />
               <Input placeholder="Post title (required)" value={title} onChange={(e) => setTitle(e.target.value)} className="flex-1" />
             </div>
-
             <div className="mt-3 flex gap-3">
               <Textarea placeholder="Description (required)" value={description} onChange={(e) => setDescription(e.target.value)} className="flex-1" rows={3} />
               <div className="w-64 flex flex-col gap-2">
                 <select className="p-2 rounded-md border" value={category} onChange={(e) => setCategory(e.target.value)}>
                   {categories.map((c) => (<option key={c}>{c}</option>))}
                 </select>
-
                 <select className="p-2 rounded-md border" value={location} onChange={(e) => setLocation(e.target.value)}>
                   <option value="">Select location (optional)</option>
                   {locations.map((l) => (<option key={l} value={l}>{l}</option>))}
                 </select>
-
                 <Button onClick={handleCreatePost} className="mt-2">Post</Button>
               </div>
             </div>
           </CardContent>
         </Card>
 
+        {/* Posts list */}
         <div className="space-y-5">
           {loading && <div className="text-center text-slate-500">Loading posts…</div>}
           {!loading && posts.length === 0 && <div className="text-center text-slate-500">No posts yet — be the first to share!</div>}
@@ -219,6 +223,7 @@ export default function CommunityForum() {
               <motion.div key={post._id} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}>
                 <Card className="shadow-sm">
                   <CardContent>
+                    {/* Post header */}
                     <div className="flex justify-between items-start">
                       <div className="flex items-center gap-3">
                         <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center font-semibold text-blue-700">{String(post.userName || "U").charAt(0).toUpperCase()}</div>
@@ -231,6 +236,7 @@ export default function CommunityForum() {
                         </div>
                       </div>
 
+                      {/* Post actions */}
                       <div className="flex items-center gap-2 text-slate-500">
                         <button onClick={() => toggleLike(post._id, userName || "Guest")} className="flex items-center gap-2 px-2 py-1 rounded hover:bg-slate-100">
                           <Heart size={16} className="text-red-500" />
@@ -244,10 +250,11 @@ export default function CommunityForum() {
 
                         <button onClick={() => openEdit(post)} className="p-1 rounded hover:bg-slate-100"><Edit3 size={16} /></button>
                         <button onClick={() => handleDelete(post._id)} className="p-1 rounded hover:bg-slate-100"><Trash2 size={16} /></button>
-                        <button onClick={() => { alert("Report received (demo)"); }} className="p-1 rounded hover:bg-slate-100"><Flag size={16} /></button>
+                        <button onClick={() => alert("Report received (demo)")} className="p-1 rounded hover:bg-slate-100"><Flag size={16} /></button>
                       </div>
                     </div>
 
+                    {/* Post body */}
                     <div className="mt-4">
                       {editingPostId === post._id ? (
                         <div className="space-y-2">
@@ -280,7 +287,7 @@ export default function CommunityForum() {
                   </CardContent>
                 </Card>
 
-                {/* comment modal */}
+                {/* Comment modal */}
                 <AnimatePresence>
                   {commentModalOpenFor === post._id && (
                     <motion.div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
@@ -317,7 +324,6 @@ export default function CommunityForum() {
                                     <div className="text-sm">{r.text}</div>
                                   </div>
                                 ))}
-
                                 <ReplyInput postId={post._id} parentIndex={idx} onReply={(text) => addThreadReply(post._id, idx, text)} placeholder={`Reply to ${c.userName}...`} />
                               </div>
                             </div>
@@ -344,7 +350,7 @@ export default function CommunityForum() {
   );
 }
 
-/* ReplyInput component (local state per input) */
+/* ReplyInput component */
 function ReplyInput({ postId, parentIndex, onReply, placeholder }: { postId: string; parentIndex: number; onReply: (text: string) => void; placeholder?: string }) {
   const [text, setText] = useState("");
   return (

@@ -4,22 +4,37 @@ import Post from "../models/Post.js";
 const router = express.Router();
 
 // Allowed location choices
-const ALLOWED_LOCATIONS = ["India", "USA", "UK"];
+const ALLOWED_LOCATIONS = ["Delhi", "Mumbai", "Bengaluru", "Hyderabad", "Chennai", "Kolkata", "Pune", "Other"];
 
 // -------------------- CREATE POST --------------------
 router.post("/", async (req, res) => {
   try {
-    const { title, content, location } = req.body;
+    const { userName, title, description, category, location } = req.body;
+
+    console.log("Create Post Body:", req.body); // 🔹 Debug
+
+    // Validate required fields
+    if (!userName?.trim() || !title?.trim() || !description?.trim() || !category?.trim()) {
+      return res.status(400).json({ error: "Missing required fields" });
+    }
 
     // Validate location if provided
     if (location && !ALLOWED_LOCATIONS.includes(location)) {
       return res.status(400).json({ error: "Invalid location choice" });
     }
 
-    const post = new Post({ title, content, location });
+    const post = new Post({
+      userName: userName.trim(),
+      title: title.trim(),
+      description: description.trim(),
+      category: category.trim(),
+      location: location || "",
+    });
+
     await post.save();
     res.status(201).json(post);
   } catch (err) {
+    console.error("Create Post Error:", err);
     res.status(400).json({ error: err.message });
   }
 });
@@ -98,9 +113,7 @@ router.put("/:id", async (req, res) => {
       return res.status(400).json({ error: "Invalid location choice" });
     }
 
-    const updated = await Post.findByIdAndUpdate(req.params.id, req.body, {
-      new: true,
-    });
+    const updated = await Post.findByIdAndUpdate(req.params.id, req.body, { new: true });
     res.json(updated);
   } catch (err) {
     res.status(400).json({ error: err.message });
