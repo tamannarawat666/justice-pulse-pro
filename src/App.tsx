@@ -23,6 +23,7 @@ import Dashboard from "./pages/Dashboard";
 import AISummarizer from "./pages/AISummarizer";
 import NotFoundPage from "./pages/NotFoundPage";
 import CommunityForum from "./pages/CommunityForum";
+import LegalScanner from "./pages/LegalScanner";
 
 const queryClient = new QueryClient();
 
@@ -109,7 +110,7 @@ const App = () => (
                   path="/ai-summarizer" 
                   element={
                     <ProtectedRoute>
-                      <AISummarizer />
+                      <LegalScanner />
                     </ProtectedRoute>
                   } 
                 />
