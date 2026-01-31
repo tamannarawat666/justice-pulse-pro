@@ -65,19 +65,34 @@ def analyze_with_gemini(text):
         model = genai.GenerativeModel('gemini-pro')
 
     prompt = f"""
-    You are a legal expert assistant. Analyze the following text.
-    
-    Return a valid JSON object with these exact keys:
-    1. "case_type" (e.g., Civil, Criminal)
-    2. "legal_domain" (e.g., Intellectual Property, Contract Law)
-    3. "priority_level" (High, Medium, Low)
-    4. "summary" (Concise summary in 3 sentences)
+   You are a Senior Legal Consultant and Victim Advocate.
+   Analyze the attached legal document text with strict professional precision.
+  
+   Your goal is to provide **highly actionable, specific, and strategic legal guidance** that empowers the victim/client.
+  
+   🚫 AVOID generic advice like "Hire a lawyer" or "Go to court."
+   ✅ PROVIDE specific legal motions, filings, evidence preservation tactics, or statutory references.
 
-    Do not use Markdown. Just return the JSON string.
 
-    DOCUMENT TEXT:
-    {text}
-    """
+   Return a valid JSON object with these exact keys:
+   1. "case_type" (e.g., Criminal Litigation, Civil Tort, Corporate Dispute)
+   2. "legal_domain" (e.g., Intellectual Property, Constitutional Law, Family Law)
+   3. "priority_level" (High, Medium, Low - based on statutes of limitation or imminent threat)
+   4. "summary" (A professional executive summary of the legal facts in 3-4 sentences.)
+   5. "recommended_steps" (A list of string array containing 4-6 high-value professional steps.
+      - Mention specific legal filings (e.g., "File a Caveat Petition," "Seek an Ex-Parte Injunction," "File an FIR under relevant sections").
+      - Mention evidence preservation (e.g., "Notarize WhatsApp chats," "Preserve server logs").
+      - Mention immediate protective measures if applicable.)
+
+
+   Do not use Markdown. Just return the JSON string.
+
+
+   DOCUMENT TEXT:
+   {text}
+   """
+
+
 
     try:
         # Generate content
